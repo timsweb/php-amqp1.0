@@ -206,6 +206,49 @@ $client->consume($address)
     ->run();
 ```
 
+### Streams and Stream Filtering
+
+RabbitMQ streams are immutable log-structured queues optimized for high-throughput scenarios.
+
+```php
+use AMQP10\Address\AddressHelper;
+
+// Consume from stream
+$address = AddressHelper::streamAddress('my-stream');
+$client->consume($address)
+    ->offset(Offset::FIRST)
+    ->filter("priority >= 5 AND type = 'order'")
+    ->handle(function ($msg, $ctx) {
+        process($msg);
+        $ctx->accept();
+    })
+    ->run();
+
+// Stream-specific options
+$address = AddressHelper::streamAddress('my-stream');
+$client->consume($address)
+    ->offset(Offset::LAST)
+    ->filter("created_at > '2026-01-01'")
+    ->credit(100) // More aggressive credit for streams
+    ->handle(function ($msg, $ctx) {
+        process($msg);
+        $ctx->accept();
+    })
+    ->run();
+```
+
+**Stream offsets:**
+- `Offset::FIRST` - Start from beginning
+- `Offset::LAST` - Start from newest
+- `Offset::NEXT` - Start after last consumed
+- `Offset::OFFSET(n)` - Start from specific offset
+
+**Stream filters:**
+- SQL-like filter expressions evaluated server-side
+- Reduces network traffic by filtering before delivery
+- Combines with Bloom filters for efficient chunk-level filtering
+```
+
 **Delivery outcomes:**
 - `accept()` - Message successfully processed (equivalent to AMQP 0.9.1 basic.ack)
 - `reject(requeue: false)` - Invalid message, dead-letter (basic.nack)
@@ -276,6 +319,7 @@ class AddressHelper
 {
     public static function exchangeAddress(string $exchangeName, string $routingKey = ''): string;
     public static function queueAddress(string $queueName): string;
+    public static function streamAddress(string $streamName): string;
 }
 ```
 
@@ -286,6 +330,7 @@ class AddressHelper
 
 **Source addresses (for consuming):**
 - `AddressHelper::queueAddress('my-queue')` → `/queues/my-queue`
+- `AddressHelper::streamAddress('my-stream')` → `/streams/my-stream`
 
 **Percent-encoding:** Special characters in exchange/queue/routing-key names are automatically percent-encoded per RFC 3986.
 
@@ -363,10 +408,13 @@ tests/
 │   │   ├── PublisherTest.php
 │   │   ├── ConsumerTest.php
 │   │   └── MessageTest.php
-│   └── Connection/
-│       ├── SaslTest.php
-│       ├── AutoReconnectTest.php
-│       └── ConnectionTest.php
+│   ├── Connection/
+│   │   ├── SaslTest.php
+│   │   ├── AutoReconnectTest.php
+│   │   └── ConnectionTest.php
+│   └── Stream/
+│       ├── StreamConsumerTest.php
+│       └── StreamFilterTest.php
 └── Mocks/
     ├── TransportMock.php
     ├── FrameBuilder.php
@@ -381,6 +429,32 @@ tests/
 - Test message encoding/decoding in isolation
 - Simulate protocol states (connection, session, link)
 - Mock broker responses for outcomes and errors
+
+### Development/Testing with Docker
+
+For local development and testing, especially with async runtimes like OpenSwoole, Docker is the preferred approach:
+
+```bash
+# Start RabbitMQ 4.0+ with AMQP 1.0 enabled
+docker run -d --name rabbitmq \
+  -p 5672:5672 \
+  -p 15672:15672 \
+  rabbitmq:4-management
+
+# Run tests in container
+docker run --rm -v $(pwd):/app \
+  -w /app \
+  --link rabbitmq:rabbitmq \
+  php:8.1-cli \
+  composer test
+
+# For OpenSwoole testing
+docker run --rm -v $(pwd):/app \
+  -w /app \
+  --link rabbitmq:rabbitmq \
+  phpswoole/swoole:php8.1 \
+  composer test
+```
 
 ## Transport Adapters
 
@@ -438,6 +512,8 @@ AMQP 1.0 messages consist of:
 - Auto-reconnection
 - TLS/SSL
 - SASL authentication (PLAIN, EXTERNAL)
+- Stream protocol support
+- AMQP filter expressions for streams
 
 ### Limitations
 
@@ -472,11 +548,11 @@ AMQP 1.0 messages consist of:
 **Potential future features:**
 - Request-response pattern helpers
 - Dead-letter queue utilities
-- Stream protocol support
 - Connection pool
 - Metrics and observability hooks
 - Distributed tracing integration
 - Message compression
+- Stream offset management utilities
 
 ## References
 
