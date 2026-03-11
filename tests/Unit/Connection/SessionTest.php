@@ -1,0 +1,61 @@
+<?php
+namespace AMQP10\Tests\Connection;
+
+use AMQP10\Connection\Session;
+use AMQP10\Protocol\Descriptor;
+use AMQP10\Protocol\FrameParser;
+use AMQP10\Protocol\PerformativeEncoder;
+use AMQP10\Protocol\TypeDecoder;
+use AMQP10\Tests\Mocks\TransportMock;
+use PHPUnit\Framework\TestCase;
+
+class SessionTest extends TestCase
+{
+    private function makeOpenSession(): array
+    {
+        $mock    = new TransportMock();
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        return [$mock, $session];
+    }
+
+    public function test_begin_sends_begin_frame(): void
+    {
+        [$mock, $session] = $this->makeOpenSession();
+        $parser = new FrameParser();
+        $parser->feed($mock->sent());
+        $frames = $parser->readyFrames();
+        $this->assertNotEmpty($frames);
+        $performative = (new TypeDecoder(FrameParser::extractBody($frames[0])))->decode();
+        $this->assertSame(Descriptor::BEGIN, $performative['descriptor']);
+    }
+
+    public function test_begin_sends_on_correct_channel(): void
+    {
+        [$mock, $session] = $this->makeOpenSession();
+        $parser = new FrameParser();
+        $parser->feed($mock->sent());
+        $frames = $parser->readyFrames();
+        $this->assertSame(0, FrameParser::extractChannel($frames[0]));
+    }
+
+    public function test_is_open_after_begin(): void
+    {
+        [, $session] = $this->makeOpenSession();
+        $this->assertTrue($session->isOpen());
+    }
+
+    public function test_end_sends_end_frame(): void
+    {
+        [$mock, $session] = $this->makeOpenSession();
+        $mock->clearSent();
+        $session->end();
+        $parser = new FrameParser();
+        $parser->feed($mock->sent());
+        $frames = $parser->readyFrames();
+        $this->assertNotEmpty($frames);
+        $performative = (new TypeDecoder(FrameParser::extractBody($frames[0])))->decode();
+        $this->assertSame(Descriptor::END, $performative['descriptor']);
+    }
+}
