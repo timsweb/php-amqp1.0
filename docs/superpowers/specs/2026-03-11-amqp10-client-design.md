@@ -135,36 +135,44 @@ $management->deleteExchange('my-exchange');
 
 ### Publishing
 
-Send messages to exchanges using AMQP 1.0 address format.
+Send messages to exchanges using AddressHelper for clean, intuitive API.
 
 ```php
-// Basic publish
-$client->publish('/exchanges/my-exchange/my-routing-key')
+use AMQP10\Address\AddressHelper;
+
+// Basic publish to exchange with routing key
+$address = AddressHelper::exchangeAddress('my-exchange', 'my-routing-key');
+$client->publish($address)
     ->send(new Messaging\Message('hello world'));
 
+// Publish to exchange without routing key (fanout/headers)
+$address = AddressHelper::exchangeAddress('my-exchange');
+$client->publish($address)
+    ->send(new Messaging\Message('broadcast'));
+
 // Publish with options
-$client->publish('/exchanges/my-exchange/my-routing-key')
+$address = AddressHelper::exchangeAddress('my-exchange', 'my-routing-key');
+$client->publish($address)
     ->ttl(60000)
     ->priority(5)
     ->send(new Messaging\Message('hello world', properties: ['content-type' => 'text/plain']));
 
 // Send to queue (uses default exchange internally)
-$client->publish('/queues/my-queue')
+$address = AddressHelper::queueAddress('my-queue');
+$client->publish($address)
     ->send(new Messaging\Message('direct to queue'));
 ```
 
-**Address formats (RabbitMQ v2):**
-- `/exchanges/:exchange/:routing-key` - Send to exchange with routing key
-- `/exchanges/:exchange` - Send to exchange (for fanout/headers exchanges)
-- `/queues/:queue` - Send directly to queue
-
 ### Consuming
 
-Receive messages from queues with callback handlers.
+Receive messages from queues using AddressHelper for clean, intuitive API.
 
 ```php
+use AMQP10\Address\AddressHelper;
+
 // Basic consume
-$client->consume('/queues/my-queue')
+$address = AddressHelper::queueAddress('my-queue');
+$client->consume($address)
     ->handle(function (Messaging\Message $message, Messaging\DeliveryContext $ctx) {
         echo "Received: " . $message->body() . "\n";
         $ctx->accept();
@@ -172,7 +180,8 @@ $client->consume('/queues/my-queue')
     ->run();
 
 // With prefetch
-$client->consume('/queues/my-queue')
+$address = AddressHelper::queueAddress('my-queue');
+$client->consume($address)
     ->prefetch(10)
     ->handle(function ($msg, $ctx) {
         // Process message
@@ -181,7 +190,8 @@ $client->consume('/queues/my-queue')
     ->run();
 
 // With error handling
-$client->consume('/queues/my-queue')
+$address = AddressHelper::queueAddress('my-queue');
+$client->consume($address)
     ->handle(function ($msg, $ctx) {
         try {
             process($msg);
@@ -257,18 +267,27 @@ $client = Client::connect('amqp://guest:guest@localhost:5672/')
 
 ### Address Resolution
 
-RabbitMQ implements AMQP 1.0 address format v2:
+AddressHelper provides a clean API for constructing AMQP 1.0 addresses (RabbitMQ v2 format).
 
-**Target addresses:**
-- `/exchanges/:exchange/:routing-key` - Send to exchange with routing key
-- `/exchanges/:exchange` - Send to exchange (empty routing key)
-- `/queues/:queue` - Send to queue
-- `null` - Dynamic routing per message (set in message `to` field)
+```php
+namespace AMQP10\Address;
 
-**Source addresses:**
-- `/queues/:queue` - Consume from queue
+class AddressHelper
+{
+    public static function exchangeAddress(string $exchangeName, string $routingKey = ''): string;
+    public static function queueAddress(string $queueName): string;
+}
+```
 
-**Percent-encoding:** Special characters in exchange/queue/routing-key names must be percent-encoded per RFC 3986.
+**Target addresses (for publishing):**
+- `AddressHelper::exchangeAddress('my-exchange', 'my-key')` → `/exchanges/my-exchange/my-key`
+- `AddressHelper::exchangeAddress('my-exchange')` → `/exchanges/my-exchange` (for fanout/headers)
+- `AddressHelper::queueAddress('my-queue')` → `/queues/my-queue`
+
+**Source addresses (for consuming):**
+- `AddressHelper::queueAddress('my-queue')` → `/queues/my-queue`
+
+**Percent-encoding:** Special characters in exchange/queue/routing-key names are automatically percent-encoded per RFC 3986.
 
 ## Error Handling
 
