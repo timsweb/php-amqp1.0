@@ -208,28 +208,30 @@ $client->consume($address)
 
 ### Streams and Stream Filtering
 
-RabbitMQ streams are immutable log-structured queues optimized for high-throughput scenarios.
+RabbitMQ streams are immutable log-structured queues optimized for high-throughput scenarios. They support two-stage filtering for maximum efficiency.
 
 ```php
 use AMQP10\Address\AddressHelper;
 
-// Consume from stream
+// Consume from stream with SQL filter (Stage 2)
 $address = AddressHelper::streamAddress('my-stream');
 $client->consume($address)
     ->offset(Offset::FIRST)
-    ->filter("priority >= 5 AND type = 'order'")
+    ->filterSql("priority >= 5 AND type = 'order'")
+    ->credit(100)
     ->handle(function ($msg, $ctx) {
         process($msg);
         $ctx->accept();
     })
     ->run();
 
-// Stream-specific options
+// Consume with both Bloom filter (Stage 1) and SQL filter (Stage 2) - most efficient
 $address = AddressHelper::streamAddress('my-stream');
 $client->consume($address)
     ->offset(Offset::LAST)
-    ->filter("created_at > '2026-01-01'")
-    ->credit(100) // More aggressive credit for streams
+    ->filterValues('order.created', 'invoice.paid') // Stage 1: Bloom filter (chunk-level)
+    ->filterSql("created_at > '2026-01-01'") // Stage 2: SQL filter (message-level)
+    ->credit(100)
     ->handle(function ($msg, $ctx) {
         process($msg);
         $ctx->accept();
@@ -243,11 +245,32 @@ $client->consume($address)
 - `Offset::NEXT` - Start after last consumed
 - `Offset::OFFSET(n)` - Start from specific offset
 
-**Stream filters:**
-- SQL-like filter expressions evaluated server-side
-- Reduces network traffic by filtering before delivery
-- Combines with Bloom filters for efficient chunk-level filtering
-```
+**Stream filtering (two stages):**
+
+Stream filtering combines two techniques for maximum efficiency:
+
+**Stage 1: Bloom Filter (chunk-level)**
+- Very efficient - skips entire chunks from disk
+- Publishers assign filter value via `x-stream-filter-value` message annotation
+- Consumers specify one or multiple filter values to match
+- Can have false positives, so use with Stage 2 for precision
+
+**Stage 2: AMQP Filter Expressions (message-level)**
+- SQL-like syntax evaluated server-side per message
+- Precise message-level filtering after reading from memory
+- Supported sections: header (priority field), properties, application-properties
+- Example: `"priority > 4 AND type = 'order' AND region IN ('EMEA', 'APAC')"`
+
+**Best practice:** Combine both stages:
+- Use Bloom filter to skip chunks that don't contain relevant messages
+- Use SQL filter for precise filtering of messages that were read
+- Provides efficient chunk-level filtering + precise message-level filtering
+
+**Credit (flow control):**
+- Consumers grant credit to RabbitMQ indicating how many messages they can handle
+- Higher credit = more messages in flight, better throughput (but higher memory)
+- Lower credit = backpressure control, prevents overwhelming consumer
+- Default: 10 messages, configurable via `credit()` method
 
 **Delivery outcomes:**
 - `accept()` - Message successfully processed (equivalent to AMQP 0.9.1 basic.ack)
