@@ -105,16 +105,15 @@ class TypeEncoder
      */
     public static function encodeMap(array $pairs): string
     {
+        if (empty($pairs)) {
+            return pack('CCC', TypeCode::MAP8, 1, 0);
+        }
+
         $body  = '';
         $count = 0;
         foreach ($pairs as $key => $value) {
             $body  .= $key . $value;
             $count += 2;
-        }
-
-        if (empty($pairs)) {
-            $size8 = 1;
-            return pack('CCC', TypeCode::MAP8, $size8, 0);
         }
 
         $size8 = 1 + strlen($body);
@@ -134,6 +133,12 @@ class TypeEncoder
      */
     public static function encodeSymbolArray(array $symbols): string
     {
+        foreach ($symbols as $sym) {
+            if (strlen($sym) > 0xFF) {
+                throw new \InvalidArgumentException('Symbol exceeds 255 bytes; use encodeSymbol separately for large symbols');
+            }
+        }
+
         $elementPayloads = '';
         foreach ($symbols as $sym) {
             $elementPayloads .= pack('C', strlen($sym)) . $sym;

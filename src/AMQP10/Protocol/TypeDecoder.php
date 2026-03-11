@@ -143,7 +143,7 @@ class TypeDecoder
         for ($i = 0; $i < $count; $i++) {
             $elementDecoder = new self(pack('C', $constructor) . substr($this->buffer, $this->offset));
             $item           = $elementDecoder->decode();
-            $this->offset  += $elementDecoder->offset() - 1;
+            $this->offset  += $elementDecoder->offset() - 1; // -1: sub-decoder buffer starts with prepended constructor byte
             $items[]        = $item;
         }
         return $items;
@@ -225,16 +225,22 @@ class TypeDecoder
 
     private function readVar8(): string
     {
-        $len    = $this->readByte();
-        $value  = substr($this->buffer, $this->offset, $len);
+        $len = $this->readByte();
+        if ($len > $this->remaining()) {
+            throw new FrameException("Buffer too short: need {$len} bytes, have {$this->remaining()}");
+        }
+        $value = substr($this->buffer, $this->offset, $len);
         $this->offset += $len;
         return $value;
     }
 
     private function readVar32(): string
     {
-        $len    = $this->readUint32();
-        $value  = substr($this->buffer, $this->offset, $len);
+        $len = $this->readUint32();
+        if ($len > $this->remaining()) {
+            throw new FrameException("Buffer too short: need {$len} bytes, have {$this->remaining()}");
+        }
+        $value = substr($this->buffer, $this->offset, $len);
         $this->offset += $len;
         return $value;
     }
