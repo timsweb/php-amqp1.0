@@ -81,8 +81,8 @@ class PerformativeEncoder
             TypeEncoder::encodeBool($role),
             TypeEncoder::encodeUbyte($sndSettleMode),
             TypeEncoder::encodeUbyte($rcvSettleMode),
-            self::encodeTerminus($source),
-            self::encodeTerminus($target),
+            self::encodeSource($source),
+            self::encodeTarget($target),
         ];
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::ATTACH, $fields));
     }
@@ -202,14 +202,26 @@ class PerformativeEncoder
         );
     }
 
-    private static function encodeTerminus(?string $address): string
+    private static function encodeSource(?string $address): string
     {
         if ($address === null) {
             return TypeEncoder::encodeNull();
         }
         $fields = [TypeEncoder::encodeString($address)];
         return TypeEncoder::encodeDescribed(
-            TypeEncoder::encodeUlong(0x28),
+            TypeEncoder::encodeUlong(0x28), // source descriptor
+            TypeEncoder::encodeList($fields),
+        );
+    }
+
+    private static function encodeTarget(?string $address): string
+    {
+        if ($address === null) {
+            return TypeEncoder::encodeNull();
+        }
+        $fields = [TypeEncoder::encodeString($address)];
+        return TypeEncoder::encodeDescribed(
+            TypeEncoder::encodeUlong(0x29), // target descriptor
             TypeEncoder::encodeList($fields),
         );
     }
