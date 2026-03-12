@@ -22,7 +22,7 @@ class BlockingAdapter implements TransportInterface
             throw new ConnectionFailedException("Cannot connect to $address: $errstr (errno $errno)");
         }
 
-        stream_set_blocking($stream, false);
+        stream_set_blocking($stream, true);
         $this->stream = $stream;
     }
 
@@ -39,7 +39,15 @@ class BlockingAdapter implements TransportInterface
         if ($this->stream === null) {
             throw new ConnectionFailedException('Not connected');
         }
-        fwrite($this->stream, $bytes);
+        $total  = strlen($bytes);
+        $offset = 0;
+        while ($offset < $total) {
+            $written = fwrite($this->stream, substr($bytes, $offset));
+            if ($written === false) {
+                throw new ConnectionFailedException('Failed to write to socket');
+            }
+            $offset += $written;
+        }
     }
 
     public function read(int $length = 4096): ?string
@@ -48,8 +56,8 @@ class BlockingAdapter implements TransportInterface
             throw new ConnectionFailedException('Not connected');
         }
         $data = fread($this->stream, $length);
-        if ($data === false || ($data === '' && feof($this->stream))) {
-            return null;
+        if ($data === false || $data === '') {
+            return null; // connection closed
         }
         return $data;
     }
