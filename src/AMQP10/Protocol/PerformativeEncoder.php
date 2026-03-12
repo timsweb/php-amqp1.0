@@ -226,13 +226,16 @@ class PerformativeEncoder
         } else {
             $fields = [
                 TypeEncoder::encodeString($address),
-                TypeEncoder::encodeNull(),
-                TypeEncoder::encodeNull(),
-                TypeEncoder::encodeNull(),
-                TypeEncoder::encodeNull(),
-                TypeEncoder::encodeNull(),
-                TypeEncoder::encodeNull(),
-                $filterMap,
+                TypeEncoder::encodeNull(), // durable
+                TypeEncoder::encodeNull(), // expiry-policy
+                TypeEncoder::encodeNull(), // timeout
+                TypeEncoder::encodeNull(), // dynamic
+                TypeEncoder::encodeNull(), // dynamic-node-properties
+                TypeEncoder::encodeNull(), // distribution-mode
+                $filterMap,               // filter (field 7)
+                TypeEncoder::encodeNull(), // default-outcome
+                TypeEncoder::encodeNull(), // outcomes
+                TypeEncoder::encodeSymbolArray(['rabbit:stream']), // capabilities (field 10)
             ];
         }
         return TypeEncoder::encodeDescribed(
