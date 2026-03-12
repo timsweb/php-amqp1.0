@@ -30,9 +30,14 @@ class PublisherTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
-        // Queue DISPOSITION (accepted) to be returned when Publisher awaits outcome.
-        // Publisher sends ATTACH then TRANSFER; we queue the disposition so awaitOutcome
-        // finds it when it reads from the transport.
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0,
+            name:    'sender-link',
+            handle:  0,
+            role:    PerformativeEncoder::ROLE_RECEIVER,
+            source:  null,
+            target:  '/queues/test',
+        ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
             channel:  0,
             role:     PerformativeEncoder::ROLE_RECEIVER,
@@ -65,6 +70,14 @@ class PublisherTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0,
+            name:    'sender-link',
+            handle:  0,
+            role:    PerformativeEncoder::ROLE_RECEIVER,
+            source:  null,
+            target:  '/queues/test',
+        ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
             channel:  0,
             role:     PerformativeEncoder::ROLE_RECEIVER,
@@ -83,6 +96,14 @@ class PublisherTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0,
+            name:    'sender-link',
+            handle:  0,
+            role:    PerformativeEncoder::ROLE_RECEIVER,
+            source:  null,
+            target:  '/queues/test',
+        ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
             channel:  0,
             role:     PerformativeEncoder::ROLE_RECEIVER,
@@ -109,6 +130,14 @@ class PublisherTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0,
+            name:    'sender-link',
+            handle:  0,
+            role:    PerformativeEncoder::ROLE_RECEIVER,
+            source:  null,
+            target:  '/queues/test',
+        ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
             channel:  0,
             role:     PerformativeEncoder::ROLE_RECEIVER,

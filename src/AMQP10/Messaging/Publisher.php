@@ -12,15 +12,13 @@ use AMQP10\Protocol\TypeDecoder;
 class Publisher
 {
     private readonly SenderLink $link;
-    private readonly FrameParser $parser;
 
     public function __construct(
         private readonly Session $session,
         private readonly string  $address,
     ) {
-        $linkName     = 'sender-' . bin2hex(random_bytes(4));
-        $this->link   = new SenderLink($session, name: $linkName, target: $address);
-        $this->parser = new FrameParser();
+        $linkName   = 'sender-' . bin2hex(random_bytes(4));
+        $this->link = new SenderLink($session, name: $linkName, target: $address);
         $this->link->attach();
     }
 
@@ -29,7 +27,7 @@ class Publisher
         $payload    = MessageEncoder::encode($message);
         $deliveryId = $this->link->transfer($payload);
         if ($this->link->isPreSettled()) {
-            return Outcome::accepted(); // fire-and-forget: broker sends no DISPOSITION
+            return Outcome::accepted();
         }
         return $this->awaitOutcome($deliveryId);
     }
@@ -41,38 +39,30 @@ class Publisher
 
     private function awaitOutcome(int $deliveryId): Outcome
     {
-        $transport = $this->session->transport();
-
         while (true) {
-            $data = $transport->read(4096);
-            if ($data === null) {
+            $frame = $this->session->nextFrame();
+            if ($frame === null) {
                 throw new PublishException('Connection closed while awaiting outcome');
             }
-            if ($data !== '') {
-                $this->parser->feed($data);
+
+            $body         = FrameParser::extractBody($frame);
+            $performative = (new TypeDecoder($body))->decode();
+
+            if (!is_array($performative)) {
+                continue;
+            }
+            if (($performative['descriptor'] ?? null) !== Descriptor::DISPOSITION) {
+                continue;
             }
 
-            foreach ($this->parser->readyFrames() as $frame) {
-                $body        = FrameParser::extractBody($frame);
-                $performative = (new TypeDecoder($body))->decode();
-
-                if (!is_array($performative)) {
-                    continue;
-                }
-                if (($performative['descriptor'] ?? null) !== Descriptor::DISPOSITION) {
-                    continue;
-                }
-
-                $fields = $performative['value'];
-                // Disposition list fields: [0]=role, [1]=first, [2]=last, [3]=settled, [4]=state
-                $first = $fields[1] ?? null;
-                if ($first !== $deliveryId) {
-                    continue;
-                }
-
-                $state = $fields[4] ?? null;
-                return $this->decodeOutcome($state);
+            $fields = $performative['value'];
+            $first  = $fields[1] ?? null;
+            if ($first !== $deliveryId) {
+                continue;
             }
+
+            $state = $fields[4] ?? null;
+            return $this->decodeOutcome($state);
         }
     }
 

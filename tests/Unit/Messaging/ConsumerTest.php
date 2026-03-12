@@ -48,18 +48,21 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
-        // Queue a TRANSFER frame carrying body "hello"
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'hello', deliveryId: 0));
 
         $received = [];
         $contexts = [];
 
-        // The handler disconnects the mock so the consumer loop exits after one message
         $consumer = new Consumer($session, '/queues/test', credit: 1);
         $consumer->run(function (Message $msg, DeliveryContext $ctx) use (&$received, &$contexts, $mock) {
             $received[] = $msg->body();
             $contexts[] = $ctx;
-            $mock->disconnect(); // stop the loop
+            $mock->disconnect();
         });
 
         $this->assertCount(1, $received);
@@ -71,8 +74,11 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
-        // No transfer; immediately disconnect so run() exits without spinning
-        $mock->disconnect();
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
 
         $consumer = new Consumer($session, '/queues/test', credit: 5);
         $consumer->run(null);
@@ -89,9 +95,8 @@ class ConsumerTest extends TestCase
             }
         }
 
-        // attach() sends ATTACH + FLOW; detach() sends DETACH
         $this->assertContains(Descriptor::ATTACH, $descriptors, 'Consumer must send ATTACH');
-        $this->assertContains(Descriptor::FLOW, $descriptors, 'Consumer must send FLOW (credit grant)');
+        $this->assertContains(Descriptor::FLOW,   $descriptors, 'Consumer must send FLOW (credit grant)');
         $this->assertContains(Descriptor::DETACH, $descriptors, 'Consumer must send DETACH on exit');
     }
 
@@ -99,6 +104,11 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'first',  deliveryId: 0));
         $mock->queueIncoming($this->makeTransferFrame(0, 'second', deliveryId: 1));
 
@@ -121,6 +131,11 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'boom', deliveryId: 0));
 
         $errors = [];
@@ -144,10 +159,13 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
-        // Transport is already disconnected before run() is called
-        $mock->disconnect();
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
 
-        $called = false;
+        $called   = false;
         $consumer = new Consumer($session, '/queues/test', credit: 1);
         $consumer->run(function (Message $msg) use (&$called) {
             $called = true;
@@ -160,6 +178,11 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'built', deliveryId: 0));
 
         $received = [];
@@ -179,9 +202,13 @@ class ConsumerTest extends TestCase
     public function test_consumer_builder_prefetch_alias(): void
     {
         [$mock, $session] = $this->makeSession();
-        $mock->disconnect();
 
-        // prefetch() is an alias for credit(); just verify run() completes without error
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
+
         $builder = new ConsumerBuilder($session, '/queues/test');
         $builder->prefetch(20)->run();
 
