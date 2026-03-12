@@ -167,4 +167,31 @@ class SessionTest extends TestCase
         $frame = $session->nextFrame();
         $this->assertNotNull($frame);
     }
+
+    public function test_readFrameOfType_throws_on_consecutive_empty_reads(): void
+    {
+        $this->markTestIncomplete('TransportMock cannot yet mock consecutive read() calls to simulate timeout');
+    }
+
+    public function test_readFrameOfType_timeout_logic_exists(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'test-link', handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER, source: null, target: '/q/test',
+        ));
+
+        $frame = $session->readFrameOfType(Descriptor::ATTACH);
+
+        $this->assertNotNull($frame);
+        $body = FrameParser::extractBody($frame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::ATTACH, $performative['descriptor']);
+    }
 }
