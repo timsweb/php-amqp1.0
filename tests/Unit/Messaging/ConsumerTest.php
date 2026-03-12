@@ -13,6 +13,7 @@ use AMQP10\Protocol\FrameParser;
 use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeDecoder;
 use AMQP10\Tests\Mocks\TransportMock;
+use AMQP10\Messaging\Offset;
 use PHPUnit\Framework\TestCase;
 
 class ConsumerTest extends TestCase
@@ -48,18 +49,21 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
-        // Queue a TRANSFER frame carrying body "hello"
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'hello', deliveryId: 0));
 
         $received = [];
         $contexts = [];
 
-        // The handler disconnects the mock so the consumer loop exits after one message
         $consumer = new Consumer($session, '/queues/test', credit: 1);
         $consumer->run(function (Message $msg, DeliveryContext $ctx) use (&$received, &$contexts, $mock) {
             $received[] = $msg->body();
             $contexts[] = $ctx;
-            $mock->disconnect(); // stop the loop
+            $mock->disconnect();
         });
 
         $this->assertCount(1, $received);
@@ -71,8 +75,11 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
-        // No transfer; immediately disconnect so run() exits without spinning
-        $mock->disconnect();
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
 
         $consumer = new Consumer($session, '/queues/test', credit: 5);
         $consumer->run(null);
@@ -89,9 +96,8 @@ class ConsumerTest extends TestCase
             }
         }
 
-        // attach() sends ATTACH + FLOW; detach() sends DETACH
         $this->assertContains(Descriptor::ATTACH, $descriptors, 'Consumer must send ATTACH');
-        $this->assertContains(Descriptor::FLOW, $descriptors, 'Consumer must send FLOW (credit grant)');
+        $this->assertContains(Descriptor::FLOW,   $descriptors, 'Consumer must send FLOW (credit grant)');
         $this->assertContains(Descriptor::DETACH, $descriptors, 'Consumer must send DETACH on exit');
     }
 
@@ -99,6 +105,11 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'first',  deliveryId: 0));
         $mock->queueIncoming($this->makeTransferFrame(0, 'second', deliveryId: 1));
 
@@ -121,6 +132,11 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'boom', deliveryId: 0));
 
         $errors = [];
@@ -144,10 +160,13 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
-        // Transport is already disconnected before run() is called
-        $mock->disconnect();
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
 
-        $called = false;
+        $called   = false;
         $consumer = new Consumer($session, '/queues/test', credit: 1);
         $consumer->run(function (Message $msg) use (&$called) {
             $called = true;
@@ -160,6 +179,11 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'built', deliveryId: 0));
 
         $received = [];
@@ -179,12 +203,162 @@ class ConsumerTest extends TestCase
     public function test_consumer_builder_prefetch_alias(): void
     {
         [$mock, $session] = $this->makeSession();
-        $mock->disconnect();
 
-        // prefetch() is an alias for credit(); just verify run() completes without error
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
+
         $builder = new ConsumerBuilder($session, '/queues/test');
         $builder->prefetch(20)->run();
 
         $this->assertTrue(true); // no exception = pass
+    }
+
+    public function test_getFrameDescriptor_returns_transfer_descriptor(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1);
+
+        $messagePayload = MessageEncoder::encode(new Message('test'));
+        $transferFrame = PerformativeEncoder::transfer(
+            channel:        0,
+            handle:         0,
+            deliveryId:     0,
+            deliveryTag:    pack('N', 0),
+            messagePayload: $messagePayload,
+            settled:        false,
+        );
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('getFrameDescriptor');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer, $transferFrame);
+
+        $this->assertSame(Descriptor::TRANSFER, $result);
+    }
+
+    public function test_getFrameDescriptor_handles_malformed_frame(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1);
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('getFrameDescriptor');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer, '');
+
+        $this->assertNull($result);
+    }
+
+    public function test_buildFilterMap_with_offset(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, offset: Offset::offset(5));
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(1, $map);
+
+        $key = array_key_first($map);
+        $value = $map[$key];
+
+        $this->assertIsArray($value);
+        $this->assertArrayHasKey('descriptor', $value);
+        $this->assertSame('rabbitmq:stream-offset-spec', $value['descriptor']);
+        $this->assertArrayHasKey('value', $value);
+        $this->assertSame(5, $value['value']);
+    }
+
+    public function test_buildFilterMap_with_filterSql(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, filterSql: "color = 'red'");
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(1, $map);
+
+        $key = array_key_first($map);
+        $value = $map[$key];
+
+        $this->assertIsArray($value);
+        $this->assertArrayHasKey('descriptor', $value);
+        $this->assertSame('apache.org:selector-filter:string', $value['descriptor']);
+        $this->assertArrayHasKey('value', $value);
+        $this->assertSame("color = 'red'", $value['value']);
+    }
+
+    public function test_buildFilterMap_with_offset_and_filterSql(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer(
+            $session,
+            '/queues/test',
+            credit: 1,
+            offset: Offset::offset(10),
+            filterSql: "priority > 5"
+        );
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(2, $map);
+
+        $keys = array_keys($map);
+        $this->assertContains('rabbitmq:stream-offset-spec', $keys);
+        $this->assertContains('apache.org:selector-filter:string', $keys);
+    }
+
+    public function test_buildFilterMap_returns_null_when_no_filters(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1);
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNull($result);
     }
 }

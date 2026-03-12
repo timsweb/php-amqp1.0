@@ -11,7 +11,6 @@ class ConsumerBuilder
     private int       $credit       = 10;
     private ?Offset   $offset       = null;
     private ?string   $filterSql    = null;
-    private array     $filterValues = [];
 
     public function __construct(
         private readonly Session $session,
@@ -53,12 +52,6 @@ class ConsumerBuilder
         return $this;
     }
 
-    public function filterValues(string ...$values): self
-    {
-        $this->filterValues = $values;
-        return $this;
-    }
-
     public function run(): void
     {
         $consumer = new Consumer(
@@ -67,7 +60,6 @@ class ConsumerBuilder
             $this->credit,
             $this->offset,
             $this->filterSql,
-            $this->filterValues,
         );
         $consumer->run($this->handler, $this->errorHandler);
     }

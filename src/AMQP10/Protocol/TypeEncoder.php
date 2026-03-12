@@ -76,6 +76,11 @@ class TypeEncoder
         return pack('CN', TypeCode::VBIN32, $len) . $value;
     }
 
+    public static function encodeTimestamp(int $ms): string
+    {
+        return pack('C', TypeCode::TIMESTAMP) . pack('J', $ms);
+    }
+
     /**
      * Encode a list of pre-encoded AMQP values.
      * list8:  constructor(1) + size(1) + count(1) + items

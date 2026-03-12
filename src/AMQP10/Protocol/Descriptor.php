@@ -37,6 +37,10 @@ final class Descriptor
     public const RELEASED = 0x26;
     public const MODIFIED = 0x27;
 
+    // Link terminus descriptors
+    public const SOURCE = 0x28;
+    public const TARGET = 0x29;
+
     // Message sections (used in Transfer frame bodies)
     public const MSG_HEADER               = 0x70;
     public const MSG_DELIVERY_ANNOTATIONS = 0x71;

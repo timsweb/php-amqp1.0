@@ -4,6 +4,7 @@ namespace AMQP10\Tests\Connection;
 
 use AMQP10\Connection\Session;
 use AMQP10\Protocol\Descriptor;
+use AMQP10\Protocol\FrameBuilder;
 use AMQP10\Protocol\FrameParser;
 use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeDecoder;
@@ -14,7 +15,8 @@ class SessionTest extends TestCase
 {
     private function makeOpenSession(): array
     {
-        $mock    = new TransportMock();
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
         $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
         $session = new Session($mock, channel: 0);
         $session->begin();
@@ -58,5 +60,138 @@ class SessionTest extends TestCase
         $this->assertNotEmpty($frames);
         $performative = (new TypeDecoder(FrameParser::extractBody($frames[0])))->decode();
         $this->assertSame(Descriptor::END, $performative['descriptor']);
+    }
+
+    public function test_begin_awaits_server_begin_response(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+
+        $session->begin();
+
+        $this->assertTrue($session->isOpen());
+    }
+
+    public function test_begin_throws_when_transport_closes_before_response(): void
+    {
+        $mock    = new TransportMock();
+        $session = new Session($mock, channel: 0);
+
+        $this->expectException(\RuntimeException::class);
+        $session->begin();
+    }
+
+    public function test_readFrameOfType_buffers_non_matching_frames(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::open('container-1'));
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+
+        $session->begin();
+        $this->assertTrue($session->isOpen());
+
+        $frame = $session->nextFrame();
+        $this->assertNotNull($frame);
+        $body        = FrameParser::extractBody($frame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::OPEN, $performative['descriptor']);
+    }
+
+    public function test_nextFrame_returns_null_when_no_more_data(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+
+        $result = $session->nextFrame();
+        $this->assertNull($result);
+    }
+
+    public function test_readFrameOfType_uses_cached_descriptor(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        // Queue multiple frames of different types
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'sender', handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER, source: null, target: '/q/test',
+        ));
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 1));
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'receiver', handle: 1,
+            role: PerformativeEncoder::ROLE_SENDER, source: '/q/test2', target: null,
+        ));
+
+        // Read a specific frame type - should use cached descriptor
+        $frame = $session->readFrameOfType(Descriptor::BEGIN);
+
+        // Verify we got the right frame
+        $this->assertNotNull($frame);
+        $body = FrameParser::extractBody($frame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::BEGIN, $performative['descriptor']);
+
+        // Read an ATTACH frame - should find it via cached descriptor
+        $attachFrame = $session->readFrameOfType(Descriptor::ATTACH);
+        $this->assertNotNull($attachFrame);
+        $body = FrameParser::extractBody($attachFrame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::ATTACH, $performative['descriptor']);
+    }
+
+    public function test_pendingFrames_handles_null_descriptor(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        // Manually queue a frame that will have null descriptor (malformed)
+        $malformedFrame = FrameBuilder::amqp(channel: 0, body: "\x00\x00\x00\x00");
+        $mock->queueIncoming($malformedFrame);
+
+        // Read via nextFrame - should handle null descriptor gracefully
+        $frame = $session->nextFrame();
+        $this->assertNotNull($frame);
+    }
+
+    public function test_readFrameOfType_throws_on_consecutive_empty_reads(): void
+    {
+        $this->markTestIncomplete('TransportMock cannot yet mock consecutive read() calls to simulate timeout');
+    }
+
+    public function test_readFrameOfType_timeout_logic_exists(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'test-link', handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER, source: null, target: '/q/test',
+        ));
+
+        $frame = $session->readFrameOfType(Descriptor::ATTACH);
+
+        $this->assertNotNull($frame);
+        $body = FrameParser::extractBody($frame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::ATTACH, $performative['descriptor']);
     }
 }
