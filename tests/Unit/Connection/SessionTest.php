@@ -150,7 +150,7 @@ class SessionTest extends TestCase
         $this->assertSame(Descriptor::ATTACH, $performative['descriptor']);
     }
 
-    public function test_pendingFrames_handles_malformed_frame(): void
+    public function test_pendingFrames_handles_null_descriptor(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
@@ -159,12 +159,12 @@ class SessionTest extends TestCase
         $session->begin();
         $mock->clearSent();
 
-        // Manually queue a malformed frame that cannot be decoded
+        // Manually queue a frame that will have null descriptor (malformed)
         $malformedFrame = FrameBuilder::amqp(channel: 0, body: "\x00\x00\x00\x00");
         $mock->queueIncoming($malformedFrame);
 
-        // Reading a malformed frame should throw an exception
-        $this->expectException(\AMQP10\Exception\FrameException::class);
-        $session->nextFrame();
+        // Read via nextFrame - should handle null descriptor gracefully
+        $frame = $session->nextFrame();
+        $this->assertNotNull($frame);
     }
 }

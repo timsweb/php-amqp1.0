@@ -98,8 +98,12 @@ class Session
             $this->frameParser->feed($data);
             foreach ($this->frameParser->readyFrames() as $frame) {
                 $body = FrameParser::extractBody($frame);
-                $performative = (new TypeDecoder($body))->decode();
-                $frameDescriptor = is_array($performative) ? ($performative['descriptor'] ?? null) : null;
+                try {
+                    $performative = (new TypeDecoder($body))->decode();
+                    $frameDescriptor = is_array($performative) ? ($performative['descriptor'] ?? null) : null;
+                } catch (\AMQP10\Exception\FrameException $e) {
+                    $frameDescriptor = null;
+                }
                 $this->pendingFrames[] = ['raw' => $frame, 'descriptor' => $frameDescriptor];
             }
         }
@@ -135,8 +139,12 @@ class Session
         // Performance: O(n) decoding, but done once instead of O(n²)
         foreach ($frames as $frame) {
             $body = FrameParser::extractBody($frame);
-            $performative = (new TypeDecoder($body))->decode();
-            $frameDescriptor = is_array($performative) ? ($performative['descriptor'] ?? null) : null;
+            try {
+                $performative = (new TypeDecoder($body))->decode();
+                $frameDescriptor = is_array($performative) ? ($performative['descriptor'] ?? null) : null;
+            } catch (\AMQP10\Exception\FrameException $e) {
+                $frameDescriptor = null;
+            }
             $this->pendingFrames[] = ['raw' => $frame, 'descriptor' => $frameDescriptor];
         }
 
