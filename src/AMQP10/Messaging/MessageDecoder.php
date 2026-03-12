@@ -15,6 +15,7 @@ class MessageDecoder
         $body    = '';
         $props   = [];
         $appProps = [];
+        $annotations = [];
 
         while ($decoder->remaining() > 0) {
             $section = $decoder->decode(); // each section is a described type
@@ -24,13 +25,14 @@ class MessageDecoder
 
             match ($section['descriptor']) {
                 Descriptor::MSG_DATA => $body = $section['value'],
+                Descriptor::MSG_ANNOTATIONS => $annotations = $section['value'] ?? [],
                 Descriptor::MSG_PROPERTIES => $props = self::extractProperties($section['value']),
                 Descriptor::MSG_APPLICATION_PROPS => $appProps = $section['value'] ?? [],
                 default => null,
             };
         }
 
-        return new Message($body, properties: $props, applicationProperties: $appProps);
+        return new Message($body, properties: $props, applicationProperties: $appProps, annotations: $annotations);
     }
 
     private static function extractProperties(array $fields): array

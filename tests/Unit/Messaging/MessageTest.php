@@ -3,6 +3,8 @@
 namespace AMQP10\Tests\Messaging;
 
 use AMQP10\Messaging\Message;
+use AMQP10\Messaging\MessageEncoder;
+use AMQP10\Messaging\MessageDecoder;
 use PHPUnit\Framework\TestCase;
 
 class MessageTest extends TestCase
@@ -36,5 +38,13 @@ class MessageTest extends TestCase
         $msg = new Message('body', ttl: 5000, priority: 8);
         $this->assertSame(5000, $msg->ttl());
         $this->assertSame(8, $msg->priority());
+    }
+
+    public function test_annotations_roundtrip(): void
+    {
+        $msg     = new Message('body', annotations: ['x-stream-offset' => 42]);
+        $encoded = MessageEncoder::encode($msg);
+        $decoded = MessageDecoder::decode($encoded);
+        $this->assertSame(42, $decoded->annotation('x-stream-offset'));
     }
 }

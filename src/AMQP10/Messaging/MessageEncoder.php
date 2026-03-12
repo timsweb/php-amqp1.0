@@ -31,6 +31,23 @@ class MessageEncoder
             ]);
         }
 
+        // Message annotations section
+        $annotations = $message->annotations();
+        if (!empty($annotations)) {
+            $pairs = [];
+            foreach ($annotations as $key => $value) {
+                $encodedKey   = TypeEncoder::encodeSymbol((string)$key);
+                $encodedValue = match (true) {
+                    is_null($value)  => TypeEncoder::encodeNull(),
+                    is_bool($value)  => TypeEncoder::encodeBool($value),
+                    is_int($value)   => TypeEncoder::encodeUlong($value),
+                    default          => TypeEncoder::encodeString((string)$value),
+                };
+                $pairs[$encodedKey] = $encodedValue;
+            }
+            $sections .= self::sectionMap(Descriptor::MSG_ANNOTATIONS, $pairs);
+        }
+
         // Properties section
         $props = $message->properties();
         if (!empty($props)) {
