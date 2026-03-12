@@ -15,6 +15,7 @@ class Session
     private int  $nextLinkHandle = 0;
 
     private FrameParser $frameParser;
+    /** @var array{raw: string, descriptor: ?int}[] */
     private array $pendingFrames = [];
 
     public function __construct(
@@ -75,12 +76,13 @@ class Session
     {
         while (true) {
             foreach ($this->pendingFrames as $i => $frame) {
-                $body         = FrameParser::extractBody($frame);
-                $performative = (new TypeDecoder($body))->decode();
-                if (is_array($performative) && ($performative['descriptor'] ?? null) === $descriptor) {
+                if ($frame['descriptor'] === $descriptor) {
                     unset($this->pendingFrames[$i]);
+                    // Note: array_values() is O(n) but this is acceptable tradeoff
+                    // to eliminate O(n²) decoding behavior. Total complexity becomes O(n)
+                    // instead of O(n²) when searching through buffered frames.
                     $this->pendingFrames = array_values($this->pendingFrames);
-                    return $frame;
+                    return $frame['raw'];
                 }
             }
 
@@ -95,7 +97,10 @@ class Session
             }
             $this->frameParser->feed($data);
             foreach ($this->frameParser->readyFrames() as $frame) {
-                $this->pendingFrames[] = $frame;
+                $body = FrameParser::extractBody($frame);
+                $performative = (new TypeDecoder($body))->decode();
+                $frameDescriptor = is_array($performative) ? ($performative['descriptor'] ?? null) : null;
+                $this->pendingFrames[] = ['raw' => $frame, 'descriptor' => $frameDescriptor];
             }
         }
     }
@@ -103,7 +108,10 @@ class Session
     public function nextFrame(): ?string
     {
         if (!empty($this->pendingFrames)) {
-            return array_shift($this->pendingFrames);
+            // Note: array_shift() is O(n) but this is acceptable tradeoff
+            // to eliminate O(n²) decoding behavior overall
+            $frame = array_shift($this->pendingFrames);
+            return $frame['raw'];
         }
 
         if (!$this->transport->isConnected()) {
@@ -121,8 +129,18 @@ class Session
             return null;
         }
 
-        $first               = array_shift($frames);
-        $this->pendingFrames = array_merge($this->pendingFrames, $frames);
-        return $first;
+        // Note: Original code used array_merge() at line 125, but we use foreach
+        // to decode and cache descriptors for each frame. This is necessary
+        // because we need to access each frame to decode its descriptor.
+        // Performance: O(n) decoding, but done once instead of O(n²)
+        foreach ($frames as $frame) {
+            $body = FrameParser::extractBody($frame);
+            $performative = (new TypeDecoder($body))->decode();
+            $frameDescriptor = is_array($performative) ? ($performative['descriptor'] ?? null) : null;
+            $this->pendingFrames[] = ['raw' => $frame, 'descriptor' => $frameDescriptor];
+        }
+
+        $first = array_shift($this->pendingFrames);
+        return $first['raw'];
     }
 }
