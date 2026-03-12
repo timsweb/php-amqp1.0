@@ -85,4 +85,17 @@ class ReceiverLinkTest extends TestCase
         $filterField = $sourceEncoded['value'][7] ?? null;
         $this->assertNotNull($filterField, 'Filter map must be present in source terminus field 7');
     }
+
+    public function test_attach_throws_when_server_does_not_respond(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $link = new ReceiverLink($session, name: 'recv', source: '/queues/test');
+
+        $this->expectException(\RuntimeException::class);
+        $link->attach();
+    }
 }
