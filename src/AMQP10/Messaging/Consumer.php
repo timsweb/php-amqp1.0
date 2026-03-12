@@ -7,6 +7,7 @@ use AMQP10\Connection\Session;
 use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\FrameParser;
 use AMQP10\Protocol\TypeDecoder;
+use AMQP10\Protocol\TypeEncoder;
 
 class Consumer
 {
@@ -21,7 +22,46 @@ class Consumer
         private readonly array    $filterValues = [],
     ) {
         $linkName   = 'receiver-' . bin2hex(random_bytes(4));
-        $this->link = new ReceiverLink($session, name: $linkName, source: $address, initialCredit: $credit);
+        $this->link = new ReceiverLink(
+            $session,
+            name:          $linkName,
+            source:        $address,
+            initialCredit: $credit,
+            filterMap:     $this->buildFilterMap(),
+        );
+    }
+
+    private function buildFilterMap(): ?string
+    {
+        if ($this->offset === null && $this->filterSql === null) {
+            return null;
+        }
+
+        $pairs = [];
+
+        if ($this->offset !== null) {
+            $offsetValue = match ($this->offset->type) {
+                'first', 'last', 'next' => TypeEncoder::encodeSymbol($this->offset->type),
+                'offset'                => TypeEncoder::encodeUlong((int) $this->offset->value),
+                'timestamp'             => TypeEncoder::encodeTimestamp((int) $this->offset->value),
+                default                 => TypeEncoder::encodeSymbol('first'),
+            };
+            $pairs[TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec')] =
+                TypeEncoder::encodeDescribed(
+                    TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec'),
+                    $offsetValue,
+                );
+        }
+
+        if ($this->filterSql !== null) {
+            $pairs[TypeEncoder::encodeSymbol('apache.org:selector-filter:string')] =
+                TypeEncoder::encodeDescribed(
+                    TypeEncoder::encodeSymbol('apache.org:selector-filter:string'),
+                    TypeEncoder::encodeString($this->filterSql),
+                );
+        }
+
+        return TypeEncoder::encodeMap($pairs);
     }
 
     public function run(?\Closure $handler, ?\Closure $errorHandler = null): void

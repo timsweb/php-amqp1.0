@@ -16,12 +16,13 @@ class ReceiverLink
     private int  $handle;
 
     public function __construct(
-        private readonly Session $session,
-        private readonly string  $name,
-        private readonly string  $source,
-        private readonly ?string $target         = null,
-        private readonly int     $initialCredit  = 10,
-        private readonly bool    $managementLink = false,
+        private readonly Session  $session,
+        private readonly string   $name,
+        private readonly string   $source,
+        private readonly ?string  $target         = null,
+        private readonly int      $initialCredit  = 10,
+        private readonly bool     $managementLink = false,
+        private readonly ?string  $filterMap      = null,
     ) {
         $this->handle = $session->allocateHandle();
     }
@@ -40,6 +41,7 @@ class ReceiverLink
             source:     $this->source,
             target:     $this->target,
             properties: $properties,
+            filterMap:  $this->filterMap,
         ));
         $this->session->readFrameOfType(Descriptor::ATTACH);
         $this->attached = true;
