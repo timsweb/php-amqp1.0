@@ -27,6 +27,9 @@ class Publisher
     {
         $payload    = MessageEncoder::encode($message);
         $deliveryId = $this->link->transfer($payload);
+        if ($this->link->isPreSettled()) {
+            return Outcome::accepted(); // fire-and-forget: broker sends no DISPOSITION
+        }
         return $this->awaitOutcome($deliveryId);
     }
 

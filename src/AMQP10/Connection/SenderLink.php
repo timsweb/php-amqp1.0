@@ -62,4 +62,5 @@ class SenderLink
 
     public function handle(): int { return $this->handle; }
     public function isAttached(): bool { return $this->attached; }
+    public function isPreSettled(): bool { return $this->sndSettleMode === PerformativeEncoder::SND_SETTLED; }
 }
