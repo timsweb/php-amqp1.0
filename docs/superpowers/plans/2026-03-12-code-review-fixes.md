@@ -70,6 +70,9 @@ Modify `readFrameOfType()` method (lines 74-101):
             foreach ($this->pendingFrames as $i => $frame) {
                 if ($frame['descriptor'] === $descriptor) {
                     unset($this->pendingFrames[$i]);
+                    // Note: array_values() is O(n) but this is acceptable tradeoff
+                    // to eliminate O(n²) decoding behavior. Total complexity becomes O(n)
+                    // instead of O(n²) when searching through buffered frames.
                     $this->pendingFrames = array_values($this->pendingFrames);
                     return $frame['raw'];
                 }
@@ -103,6 +106,8 @@ Modify `nextFrame()` method (lines 103-127):
     public function nextFrame(): ?string
     {
         if (!empty($this->pendingFrames)) {
+            // Note: array_shift() is O(n) but this is acceptable tradeoff
+            // to eliminate O(n²) decoding behavior overall
             $frame = array_shift($this->pendingFrames);
             return $frame['raw'];
         }
@@ -122,13 +127,10 @@ Modify `nextFrame()` method (lines 103-127):
             return null;
         }
 
-        $firstRaw = array_shift($frames);
-        $firstBody = FrameParser::extractBody($firstRaw);
-        $firstPerf = (new TypeDecoder($firstBody))->decode();
-        $firstDescriptor = is_array($firstPerf) ? ($firstPerf['descriptor'] ?? null) : null;
-
-        $this->pendingFrames[] = ['raw' => $firstRaw, 'descriptor' => $firstDescriptor];
-
+        // Note: Original code used array_merge() at line 125, but we use foreach
+        // to decode and cache descriptors for each frame. This is necessary
+        // because we need to access each frame to decode its descriptor.
+        // Performance: O(n) decoding, but done once instead of O(n²)
         foreach ($frames as $frame) {
             $body = FrameParser::extractBody($frame);
             $performative = (new TypeDecoder($body))->decode();
@@ -136,11 +138,93 @@ Modify `nextFrame()` method (lines 103-127):
             $this->pendingFrames[] = ['raw' => $frame, 'descriptor' => $frameDescriptor];
         }
 
-        return $firstRaw;
+        $first = array_shift($this->pendingFrames);
+        return $first['raw'];
     }
 ```
 
-- [ ] **Step 5: Run tests to verify no regressions**
+### Task 1.2: Add test for descriptor caching behavior
+
+**Files:**
+- Modify: `tests/Unit/Connection/SessionTest.php`
+
+- [ ] **Step 1: Read current SessionTest to understand patterns**
+
+```bash
+cat tests/Unit/Connection/SessionTest.php
+```
+
+- [ ] **Step 2: Add test for descriptor caching**
+
+Add test after existing tests:
+
+```php
+
+    public function test_readFrameOfType_uses_cached_descriptor(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        // Queue multiple frames of different types
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'sender', handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER, source: null, target: '/q/test',
+        ));
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 1));
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'receiver', handle: 1,
+            role: PerformativeEncoder::ROLE_SENDER, source: '/q/test2', target: null,
+        ));
+
+        // Read a specific frame type - should use cached descriptor
+        $frame = $session->readFrameOfType(Descriptor::BEGIN);
+
+        // Verify we got the right frame
+        $this->assertNotNull($frame);
+        $body = FrameParser::extractBody($frame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::BEGIN, $performative['descriptor']);
+
+        // Read an ATTACH frame - should find it via cached descriptor
+        $attachFrame = $session->readFrameOfType(Descriptor::ATTACH);
+        $this->assertNotNull($attachFrame);
+        $body = FrameParser::extractBody($attachFrame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::ATTACH, $performative['descriptor']);
+    }
+
+    public function test_pendingFrames_handles_null_descriptor(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        // Manually queue a frame that will have null descriptor (malformed)
+        $malformedFrame = FrameBuilder::amqp(channel: 0, body: "\x00\x00\x00\x00");
+        $mock->queueIncoming($malformedFrame);
+
+        // Read via nextFrame - should handle null descriptor gracefully
+        $frame = $session->nextFrame();
+        $this->assertNotNull($frame);
+    }
+```
+
+- [ ] **Step 3: Run SessionTest**
+
+```bash
+vendor/bin/phpunit tests/Unit/Connection/SessionTest.php
+```
+
+Expected: All tests pass
+
+- [ ] **Step 4: Run all tests to verify no regressions**
 
 ```bash
 vendor/bin/phpunit
@@ -148,7 +232,7 @@ vendor/bin/phpunit
 
 Expected: All 146 unit tests and 8 integration tests pass
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/AMQP10/Connection/Session.php
