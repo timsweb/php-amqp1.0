@@ -651,7 +651,7 @@ This chunk expands the integration test to actually test stream filter functiona
 
 Change line 36 from `test_consume_from_queue` to `test_consume_from_classic_queue`
 
-- [ ] **Step 2: Add stream filter test**
+- [ ] **Step 2: Add stream offset filter test**
 
 Add after the renamed test:
 
@@ -659,29 +659,23 @@ Add after the renamed test:
 
     public function test_consume_from_stream_with_offset(): void
     {
-        // Skip if stream plugin not available
+        $streamQueue = 'test-stream-offset-' . bin2hex(random_bytes(4));
+        $address = AddressHelper::queueAddress($streamQueue);
+        $mgmt = $this->client->management();
+
         try {
-            $mgmt = $this->client->management();
-            $mgmt->declareQueue(new QueueSpecification('test-stream-queue-' . bin2hex(random_bytes(4)), QueueType::STREAM));
-            $mgmt->deleteQueue($mgmt->getLastCreatedQueue());
-            $mgmt->close();
+            $mgmt->declareQueue(new QueueSpecification($streamQueue, QueueType::STREAM));
         } catch (\Throwable $e) {
             $this->markTestSkipped('RabbitMQ stream plugin not available: ' . $e->getMessage());
             return;
         }
-
-        $streamQueue = 'test-stream-' . bin2hex(random_bytes(4));
-        $address = AddressHelper::queueAddress($streamQueue);
-        $mgmt = $this->client->management();
-
-        $mgmt->declareQueue(new QueueSpecification($streamQueue, QueueType::STREAM));
 
         // Publish 10 messages
         for ($i = 1; $i <= 10; $i++) {
             $this->client->publish($address)->send(new Message("msg-$i"));
         }
 
-        // Consume from offset 5
+        // Consume from offset 5 (1-indexed, so starts at message 5)
         $received = [];
         $count = 0;
         $client = $this->client;
@@ -690,24 +684,126 @@ Add after the renamed test:
 
         $this->client->consume($address)
             ->credit(10)
-            ->offset(Offset::type('offset', value: 5))
+            ->offset(Offset::offset(5))  // Start from message 5
             ->handle(function(\AMQP10\Messaging\Message $msg, \AMQP10\Messaging\DeliveryContext $ctx)
                 use (&$received, &$count, $client) {
                 $received[] = $msg->body();
                 $ctx->accept();
                 $count++;
-                if ($count >= 5) {  // Should receive 5 messages (6-10)
+                if ($count >= 6) {  // Should receive messages 5-10
                     $client->close();
                 }
             })
             ->run();
 
-        // Verify we got messages 6-10
-        $this->assertCount(5, $received);
-        $this->assertContains('msg-6', $received);
+        // Verify we got messages 5-10
+        $this->assertCount(6, $received);
+        $this->assertContains('msg-5', $received);
         $this->assertContains('msg-10', $received);
         $this->assertNotContains('msg-1', $received);
-        $this->assertNotContains('msg-5', $received);
+        $this->assertNotContains('msg-4', $received);
+
+        // Verify order is correct
+        $this->assertSame(['msg-5', 'msg-6', 'msg-7', 'msg-8', 'msg-9', 'msg-10'], $received);
+
+        $mgmt->deleteQueue($streamQueue);
+        $mgmt->close();
+    }
+
+    public function test_consume_from_stream_with_filterSql(): void
+    {
+        $streamQueue = 'test-stream-filter-' . bin2hex(random_bytes(4));
+        $address = AddressHelper::queueAddress($streamQueue);
+        $mgmt = $this->client->management();
+
+        try {
+            $mgmt->declareQueue(new QueueSpecification($streamQueue, QueueType::STREAM));
+        } catch (\Throwable $e) {
+            $this->markTestSkipped('RabbitMQ stream plugin not available: ' . $e->getMessage());
+            return;
+        }
+
+        // Publish messages with different colors
+        $this->client->publish($address)->send(new Message('red-1'));
+        $this->client->publish($address)->send(new Message('blue-1'));
+        $this->client->publish($address)->send(new Message('red-2'));
+        $this->client->publish($address)->send(new Message('green-1'));
+        $this->client->publish($address)->send(new Message('red-3'));
+
+        // Consume with SQL filter for messages starting with "red"
+        $received = [];
+        $count = 0;
+        $client = $this->client;
+
+        set_time_limit(30);
+
+        $this->client->consume($address)
+            ->credit(10)
+            ->filterSql("body LIKE 'red%'")  // Filter for messages starting with 'red'
+            ->handle(function(\AMQP10\Messaging\Message $msg, \AMQP10\Messaging\DeliveryContext $ctx)
+                use (&$received, &$count, $client) {
+                $received[] = $msg->body();
+                $ctx->accept();
+                $count++;
+                if ($count >= 3) {
+                    $client->close();
+                }
+            })
+            ->run();
+
+        // Verify we only got red messages
+        $this->assertCount(3, $received);
+        $this->assertContains('red-1', $received);
+        $this->assertContains('red-2', $received);
+        $this->assertContains('red-3', $received);
+        $this->assertNotContains('blue-1', $received);
+        $this->assertNotContains('green-1', $received);
+
+        $mgmt->deleteQueue($streamQueue);
+        $mgmt->close();
+    }
+
+    public function test_consume_from_stream_edge_cases(): void
+    {
+        $streamQueue = 'test-stream-edge-' . bin2hex(random_bytes(4));
+        $address = AddressHelper::queueAddress($streamQueue);
+        $mgmt = $this->client->management();
+
+        try {
+            $mgmt->declareQueue(new QueueSpecification($streamQueue, QueueType::STREAM));
+        } catch (\Throwable $e) {
+            $this->markTestSkipped('RabbitMQ stream plugin not available: ' . $e->getMessage());
+            return;
+        }
+
+        // Publish 5 messages
+        for ($i = 1; $i <= 5; $i++) {
+            $this->client->publish($address)->send(new Message("msg-$i"));
+        }
+
+        // Consume from offset 1 (first message)
+        $received = [];
+        $count = 0;
+        $client = $this->client;
+
+        set_time_limit(30);
+
+        $this->client->consume($address)
+            ->credit(10)
+            ->offset(Offset::offset(1))
+            ->handle(function(\AMQP10\Messaging\Message $msg, \AMQP10\Messaging\DeliveryContext $ctx)
+                use (&$received, &$count, $client) {
+                $received[] = $msg->body();
+                $ctx->accept();
+                $count++;
+                if ($count >= 5) {
+                    $client->close();
+                }
+            })
+            ->run();
+
+        $this->assertCount(5, $received);
+        $this->assertSame('msg-1', $received[0]);
 
         $mgmt->deleteQueue($streamQueue);
         $mgmt->close();
@@ -740,9 +836,9 @@ git commit -m "test: rename existing test and add actual stream filter test"
 cat tests/Unit/Messaging/ConsumerTest.php
 ```
 
-- [ ] **Step 2: Add buildFilterMap test**
+- [ ] **Step 2: Add buildFilterMap tests with proper verification**
 
-Add test after existing tests:
+Add tests after existing tests:
 
 ```php
 
@@ -758,7 +854,7 @@ Add test after existing tests:
             $session,
             '/streams/test',
             credit: 10,
-            offset: Offset::type('offset', value: 5),
+            offset: Offset::offset(5),
             filterSql: null,
             filterValues: [],
         );
@@ -774,10 +870,21 @@ Add test after existing tests:
         $decoder = new TypeDecoder($filterMap);
         $map = $decoder->decode();
         $this->assertIsArray($map);
+        $this->assertCount(1, $map, 'Should have exactly one filter entry');
 
-        // Check that rabbitmq:stream-offset-spec key exists
-        $offsetKey = TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec');
-        $this->assertArrayHasKey($offsetKey, $map);
+        // Decode the offset spec value and verify it's correct
+        foreach ($map as $key => $value) {
+            $keyDecoder = new TypeDecoder($key);
+            $keyValue = $keyDecoder->decode();
+            $this->assertSame('rabbitmq:stream-offset-spec', $keyValue);
+
+            // Value should be a described type with descriptor and ulong value
+            $valueDecoder = new TypeDecoder($value);
+            $valueStruct = $valueDecoder->decode();
+            $this->assertIsArray($valueStruct);
+            $this->assertSame('rabbitmq:stream-offset-spec', $valueStruct['descriptor']);
+            $this->assertSame(5, $valueStruct['value'], 'Offset value should be 5');
+        }
     }
 
     public function test_buildFilterMap_with_filterSql(): void
@@ -808,10 +915,89 @@ Add test after existing tests:
         $decoder = new TypeDecoder($filterMap);
         $map = $decoder->decode();
         $this->assertIsArray($map);
+        $this->assertCount(1, $map, 'Should have exactly one filter entry');
 
-        // Check that apache.org:selector-filter:string key exists
-        $filterKey = TypeEncoder::encodeSymbol('apache.org:selector-filter:string');
-        $this->assertArrayHasKey($filterKey, $map);
+        // Decode the filter value and verify SQL string is correct
+        foreach ($map as $key => $value) {
+            $keyDecoder = new TypeDecoder($key);
+            $keyValue = $keyDecoder->decode();
+            $this->assertSame('apache.org:selector-filter:string', $keyValue);
+
+            // Value should be a described type with descriptor and string value
+            $valueDecoder = new TypeDecoder($value);
+            $valueStruct = $valueDecoder->decode();
+            $this->assertIsArray($valueStruct);
+            $this->assertSame('apache.org:selector-filter:string', $valueStruct['descriptor']);
+            $this->assertSame("color = 'red'", $valueStruct['value'], 'Filter SQL should match');
+        }
+    }
+
+    public function test_buildFilterMap_with_offset_and_filterSql(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+
+        // Both offset and filterSql should be valid
+        $consumer = new Consumer(
+            $session,
+            '/streams/test',
+            credit: 10,
+            offset: Offset::offset(10),
+            filterSql: "priority > 5",
+            filterValues: [],
+        );
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $filterMap = $method->invoke($consumer);
+        $this->assertNotNull($filterMap, 'Filter map should be generated for both offset and filterSql');
+
+        // Decode and verify both filters are present
+        $decoder = new TypeDecoder($filterMap);
+        $map = $decoder->decode();
+        $this->assertIsArray($map);
+        $this->assertCount(2, $map, 'Should have exactly two filter entries');
+
+        // Verify both filters are present
+        $filterKeys = [];
+        foreach ($map as $key => $value) {
+            $keyDecoder = new TypeDecoder($key);
+            $keyValue = $keyDecoder->decode();
+            $filterKeys[] = $keyValue;
+        }
+
+        $this->assertContains('rabbitmq:stream-offset-spec', $filterKeys);
+        $this->assertContains('apache.org:selector-filter:string', $filterKeys);
+    }
+
+    public function test_buildFilterMap_returns_null_when_no_filters(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+
+        $consumer = new Consumer(
+            $session,
+            '/streams/test',
+            credit: 10,
+            offset: null,
+            filterSql: null,
+            filterValues: [],
+        );
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $filterMap = $method->invoke($consumer);
+        $this->assertNull($filterMap, 'Filter map should be null when no filters specified');
     }
 ```
 
