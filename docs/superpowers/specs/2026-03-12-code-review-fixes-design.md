@@ -24,13 +24,14 @@ Add a consecutive empty read counter with threshold-based timeout:
 2. Increment counter when `transport->read()` returns `''`
 3. Reset counter on any non-empty read
 4. Throw `RuntimeException` with message "Timeout awaiting frame with descriptor 0x{hex}" after 100 consecutive empty reads
-5. Threshold chosen based on typical non-blocking socket behavior - 100 reads without data indicates hung peer
+5. Threshold justification: At ~1ms per non-blocking read (typical), 100 reads = ~100ms timeout, far exceeding legitimate network latency while still failing fast enough to prevent CPU exhaustion
 
 **Rationale:**
 - Simple, explicit implementation
 - Prevents production CPU exhaustion
-- Threshold is configurable if needed
+- Threshold chosen based on empirical non-blocking socket behavior
 - Fails fast on hung connections rather than spinning indefinitely
+- Threshold is configurable if needed (can be made a class constant or parameter)
 
 ### Issue 2: Quadratic Decode in readFrameOfType()
 
@@ -46,7 +47,11 @@ Cache decoded descriptors alongside raw frames in the pending buffer:
 2. Decode descriptor immediately when frame enters buffer in `readFrameOfType()` and `nextFrame()`
 3. Store decoded descriptor alongside raw frame
 4. Use cached descriptor for filtering instead of re-decoding
-5. Update filtering logic to check `$frame['descriptor']` instead of decoding
+5. Update all access points to use new structure:
+   - Line 77-82: `foreach` loop in `readFrameOfType()` - iterate over pendingFrames, check descriptor
+   - Line 98: `$this->pendingFrames[] = $frame` in `readFrameOfType()` - push with decoded descriptor
+   - Line 105-106: `array_shift($this->pendingFrames)` in `nextFrame()` - works with new structure
+   - Line 125: `array_merge($this->pendingFrames, $frames)` in `nextFrame()` - ensure decoded descriptors preserved
 
 **Data Structure:**
 ```php
@@ -58,6 +63,7 @@ private array $pendingFrames = [];  // Each element: ['raw' => string, 'descript
 - Minimal memory overhead (one int per frame)
 - Simple change to existing structure
 - Eliminates quadratic behavior entirely
+- All access points identified and accounted for
 
 ## Important Issues
 
@@ -131,22 +137,27 @@ public function test_attach_throws_when_server_does_not_respond(): void
 Rename and expand test coverage:
 
 1. Rename existing test to `test_consume_from_classic_queue()`
-2. Add new test `test_consume_from_stream_with_offset()`:
-   - Create stream queue with `QueueType::STREAM`
-   - Publish 10 messages
-   - Consume with `Offset::first()` (or specific offset)
-   - Verify only messages from offset are received
+2. Add new integration test `test_consume_from_stream_with_offset()`:
+    - Create stream queue with `QueueType::STREAM`
+    - Publish 10 messages
+    - Consume with `Offset::first()` (or specific offset)
+    - Verify only messages from offset are received
 3. Add skip marker if RabbitMQ stream plugin unavailable:
-   ```php
-   if (!$this->hasStreamPlugin()) {
-       $this->markTestSkipped('RabbitMQ stream plugin not available');
-   }
-   ```
+    ```php
+    if (!$this->hasStreamPlugin()) {
+        $this->markTestSkipped('RabbitMQ stream plugin not available');
+    }
+4. Add unit test `test_buildFilterMap_with_offset()` to `ConsumerTest`:
+    - Create Consumer with `Offset::type('offset', value: 5)`
+    - Call `buildFilterMap()` (or verify through ReflectionMethod)
+    - Decode result and verify it contains correct filter descriptor
+    - Tests filter encoding logic without requiring stream plugin
 
 **Rationale:**
 - Actually tests the new feature
 - Clear separation of classic vs stream behavior
 - Graceful degradation when plugin unavailable
+- Unit test ensures filter encoding logic works regardless of environment
 
 ### Issue 6: Magic Numbers for Source/Target Descriptors
 
@@ -185,17 +196,25 @@ TypeEncoder::encodeUlong(Descriptor::SOURCE),
 **Problem:**
 `$filterValues` parameter accepted by `Consumer` and `ConsumerBuilder` but never used by `buildFilterMap()`.
 
-**Design:**
+**Verification Required:**
+Before removal, verify this parameter is truly unused:
+1. Search all codebase for usage of `->filterValues()` method
+2. Check public examples, documentation, or sample code
+3. If any usage found, evaluate deprecation strategy instead
+
+**Design (if verified unused):**
 Remove unused parameter:
 
 1. Remove `$filterValues` from `Consumer::__construct()`
 2. Remove `filterValues()` method from `ConsumerBuilder`
 3. Update `ConsumerBuilder::run()` to not pass it to `Consumer` constructor
+4. This is a minor version breaking change (unlikely to affect anyone if truly unused)
 
 **Rationale:**
 - Eliminates misleading API surface
 - YAGNI - never wired, not needed now
 - Can be added later with proper implementation if needed
+- If truly unused, removal is preferable to deprecation ceremony
 
 ## Minor Issues
 
@@ -257,6 +276,57 @@ Add comment above `end()` method:
 - Ensure existing 146 unit tests pass
 - Ensure existing 8 integration tests pass
 - Verify stream filter test runs or skips appropriately
+- Add unit test for filter map encoding logic
+- Add stress test for timeout behavior
+
+## Performance Validation
+
+After implementing Issue #2 (quadratic decode fix), validate performance improvement:
+
+1. Create benchmark that pipelines multiple ATTACH requests (simulating Management usage)
+2. Measure time before fix with 10, 50, 100 pending frames
+3. Measure time after fix with same frame counts
+4. Confirm O(n²) → O(n) improvement (linear vs quadratic growth)
+5. Document results in commit message or as a comment in tests
+
+Example benchmark pattern:
+```php
+// Queue 100 ATTACH responses
+$mock = new TransportMock();
+$session = new Session($mock, channel: 0);
+$session->begin();
+
+for ($i = 0; $i < 100; $i++) {
+    $mock->queueIncoming(PerformativeEncoder::attach(...));
+}
+
+$start = microtime(true);
+for ($i = 0; $i < 100; $i++) {
+    $session->readFrameOfType(Descriptor::ATTACH);
+}
+$elapsed = microtime(true) - $start;
+```
+
+## Stress Testing
+
+Add test for Issue #1 (infinite spin loop) to verify timeout behavior:
+
+```php
+public function test_readFrameOfType_throws_on_consecutive_empty_reads(): void
+{
+    $mock = new TransportMock();
+    $mock->connect('amqp://test');
+    $mock->mockReadSequence(array_fill(0, 100, ''));  // 100 empty reads
+    $session = new Session($mock, channel: 0);
+    $session->begin();
+
+    $this->expectException(\RuntimeException::class);
+    $this->expectExceptionMessage('Timeout awaiting frame');
+    $session->readFrameOfType(Descriptor::ATTACH);
+}
+```
+
+This requires extending `TransportMock` to support `mockReadSequence()`.
 
 ## Backward Compatibility
 
