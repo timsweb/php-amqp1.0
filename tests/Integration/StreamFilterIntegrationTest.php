@@ -33,7 +33,7 @@ class StreamFilterIntegrationTest extends IntegrationTestCase
         $this->client->close();
     }
 
-    public function test_consume_from_queue(): void
+    public function test_consume_from_classic_queue(): void
     {
         $address = AddressHelper::queueAddress($this->queueName);
 
@@ -62,5 +62,142 @@ class StreamFilterIntegrationTest extends IntegrationTestCase
         $this->assertCount(2, $received);
         $this->assertContains('msg-1', $received);
         $this->assertContains('msg-2', $received);
+    }
+
+    public function test_consume_from_stream_with_offset(): void
+    {
+        $mgmt = $this->client->management();
+        $queueName = $this->queueName . '-offset';
+
+        try {
+            $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::STREAM));
+        } catch (\AMQP10\Exception\ManagementException $e) {
+            $this->markTestSkipped('RabbitMQ stream plugin not available');
+        }
+
+        $address = AddressHelper::queueAddress($queueName);
+
+        for ($i = 1; $i <= 10; $i++) {
+            $this->client->publish($address)->send(new Message("msg-{$i}"));
+        }
+
+        $received = [];
+        $count    = 0;
+        $client   = $this->client;
+
+        set_time_limit(15);
+
+        $this->client->consume($address)
+            ->credit(10)
+            ->offset(Offset::offset(5))
+            ->handle(function(\AMQP10\Messaging\Message $msg, \AMQP10\Messaging\DeliveryContext $ctx)
+                use (&$received, &$count, $client) {
+                $received[] = $msg->body();
+                $ctx->accept();
+                $count++;
+                if ($count >= 6) {
+                    $client->close();
+                }
+            })
+            ->run();
+
+        $this->assertCount(6, $received);
+        $this->assertEquals(['msg-5', 'msg-6', 'msg-7', 'msg-8', 'msg-9', 'msg-10'], $received);
+
+        $mgmt->deleteQueue($queueName);
+        $mgmt->close();
+    }
+
+    public function test_consume_from_stream_with_filterSql(): void
+    {
+        $mgmt = $this->client->management();
+        $queueName = $this->queueName . '-filter';
+
+        try {
+            $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::STREAM));
+        } catch (\AMQP10\Exception\ManagementException $e) {
+            $this->markTestSkipped('RabbitMQ stream plugin not available');
+        }
+
+        $address = AddressHelper::queueAddress($queueName);
+
+        $messages = ['red-1', 'blue-1', 'red-2', 'green-1', 'red-3'];
+        foreach ($messages as $msg) {
+            $this->client->publish($address)->send(new Message($msg));
+        }
+
+        $received = [];
+        $count    = 0;
+        $client   = $this->client;
+
+        set_time_limit(15);
+
+        $this->client->consume($address)
+            ->credit(10)
+            ->filterSql("body LIKE 'red%'")
+            ->handle(function(\AMQP10\Messaging\Message $msg, \AMQP10\Messaging\DeliveryContext $ctx)
+                use (&$received, &$count, $client) {
+                $received[] = $msg->body();
+                $ctx->accept();
+                $count++;
+                if ($count >= 3) {
+                    $client->close();
+                }
+            })
+            ->run();
+
+        $this->assertCount(3, $received);
+        $this->assertContains('red-1', $received);
+        $this->assertContains('red-2', $received);
+        $this->assertContains('red-3', $received);
+        $this->assertNotContains('blue-1', $received);
+        $this->assertNotContains('green-1', $received);
+
+        $mgmt->deleteQueue($queueName);
+        $mgmt->close();
+    }
+
+    public function test_consume_from_stream_edge_cases(): void
+    {
+        $mgmt = $this->client->management();
+        $queueName = $this->queueName . '-edge';
+
+        try {
+            $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::STREAM));
+        } catch (\AMQP10\Exception\ManagementException $e) {
+            $this->markTestSkipped('RabbitMQ stream plugin not available');
+        }
+
+        $address = AddressHelper::queueAddress($queueName);
+
+        for ($i = 1; $i <= 5; $i++) {
+            $this->client->publish($address)->send(new Message("msg-{$i}"));
+        }
+
+        $received = [];
+        $count    = 0;
+        $client   = $this->client;
+
+        set_time_limit(15);
+
+        $this->client->consume($address)
+            ->credit(10)
+            ->offset(Offset::offset(1))
+            ->handle(function(\AMQP10\Messaging\Message $msg, \AMQP10\Messaging\DeliveryContext $ctx)
+                use (&$received, &$count, $client) {
+                $received[] = $msg->body();
+                $ctx->accept();
+                $count++;
+                if ($count >= 5) {
+                    $client->close();
+                }
+            })
+            ->run();
+
+        $this->assertCount(5, $received);
+        $this->assertEquals('msg-1', $received[0]);
+
+        $mgmt->deleteQueue($queueName);
+        $mgmt->close();
     }
 }
