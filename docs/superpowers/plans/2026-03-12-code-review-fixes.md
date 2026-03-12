@@ -493,11 +493,92 @@ vendor/bin/phpunit
 
 Expected: All tests pass
 
-- [ ] **Step 4: Commit**
+### Task 4.2: Add test for getFrameDescriptor
+
+**Files:**
+- Modify: `tests/Unit/Messaging/ConsumerTest.php`
+
+- [ ] **Step 1: Add test for getFrameDescriptor**
+
+Add test after existing tests:
+
+```php
+
+    public function test_getFrameDescriptor_returns_transfer_descriptor(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $consumer = new Consumer(
+            $session,
+            '/queues/test',
+            credit: 10,
+            offset: null,
+            filterSql: null,
+            filterValues: [],
+        );
+
+        // Create a TRANSFER frame
+        $transferFrame = PerformativeEncoder::transfer(
+            channel: 0,
+            handle: 0,
+            deliveryId: 1,
+            deliveryTag: 'tag-1',
+            messagePayload: '',
+            settled: true,
+        );
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('getFrameDescriptor');
+        $method->setAccessible(true);
+
+        $descriptor = $method->invoke($consumer, $transferFrame);
+        $this->assertSame(Descriptor::TRANSFER, $descriptor);
+    }
+
+    public function test_getFrameDescriptor_handles_malformed_frame(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $consumer = new Consumer(
+            $session,
+            '/queues/test',
+            credit: 10,
+            offset: null,
+            filterSql: null,
+            filterValues: [],
+        );
+
+        // Create a malformed frame
+        $malformedFrame = "\x00\x00\x00\x00\x00\x00\x00\x00";
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('getFrameDescriptor');
+        $method->setAccessible(true);
+
+        $descriptor = $method->invoke($consumer, $malformedFrame);
+        $this->assertNull($descriptor, 'Malformed frame should return null descriptor');
+    }
+```
+
+- [ ] **Step 2: Run ConsumerTest**
 
 ```bash
-git add src/AMQP10/Messaging/Consumer.php
-git commit -m "refactor: rename isTransferFrame to getFrameDescriptor to avoid misleading double decode"
+vendor/bin/phpunit tests/Unit/Messaging/ConsumerTest.php
+```
+
+Expected: All tests pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add tests/Unit/Messaging/ConsumerTest.php
+git commit -m "test: add tests for Consumer::getFrameDescriptor with valid and malformed frames"
 ```
 
 ---
