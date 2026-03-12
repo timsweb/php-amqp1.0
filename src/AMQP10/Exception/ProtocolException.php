@@ -1,21 +1,12 @@
 <?php
+declare(strict_types=1);
 
 namespace AMQP10\Exception;
 
-use AMQP10\Exception\AmqpException;
+use AMQP10\Exception\InvalidAddressException;
+use AMQP10\Exception\FrameException;
+use AMQP10\Exception\SaslException;
 
-class ProtocolException extends AmqpException
-{
-}
-
-class InvalidAddressException extends ProtocolException
-{
-}
-
-class FrameException extends ProtocolException
-{
-}
-
-class SaslException extends ProtocolException
+abstract class ProtocolException extends AmqpException
 {
 }

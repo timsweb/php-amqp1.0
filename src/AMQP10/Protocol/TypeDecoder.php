@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace AMQP10\Protocol;
 
 use AMQP10\Exception\FrameException;

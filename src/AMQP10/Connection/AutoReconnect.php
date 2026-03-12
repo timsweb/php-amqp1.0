@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace AMQP10\Connection;
 
 use AMQP10\Exception\ConnectionFailedException;

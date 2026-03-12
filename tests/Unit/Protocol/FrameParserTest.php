@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace AMQP10\Tests\Protocol;
 
 use AMQP10\Protocol\FrameBuilder;

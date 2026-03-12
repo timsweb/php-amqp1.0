@@ -1,21 +1,12 @@
 <?php
+declare(strict_types=1);
 
 namespace AMQP10\Exception;
 
-use AMQP10\Exception\AmqpException;
+use AMQP10\Exception\PublishException;
+use AMQP10\Exception\ConsumerException;
+use AMQP10\Exception\MessageTimeoutException;
 
-class MessagingException extends AmqpException
-{
-}
-
-class PublishException extends MessagingException
-{
-}
-
-class ConsumerException extends MessagingException
-{
-}
-
-class MessageTimeoutException extends MessagingException
+abstract class MessagingException extends AmqpException
 {
 }

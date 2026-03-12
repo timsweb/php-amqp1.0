@@ -1,21 +1,12 @@
 <?php
+declare(strict_types=1);
 
 namespace AMQP10\Exception;
 
-use AMQP10\Exception\AmqpException;
+use AMQP10\Exception\ConnectionFailedException;
+use AMQP10\Exception\AuthenticationException;
+use AMQP10\Exception\ConnectionClosedException;
 
-class ConnectionException extends AmqpException
-{
-}
-
-class ConnectionFailedException extends ConnectionException
-{
-}
-
-class AuthenticationException extends ConnectionException
-{
-}
-
-class ConnectionClosedException extends ConnectionException
+abstract class ConnectionException extends AmqpException
 {
 }

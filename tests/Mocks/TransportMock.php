@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace AMQP10\Tests\Mocks;
 
 use AMQP10\Transport\TransportInterface;

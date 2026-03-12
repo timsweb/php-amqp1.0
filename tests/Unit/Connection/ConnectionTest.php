@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace AMQP10\Tests\Connection;
 
 use AMQP10\Connection\Connection;
