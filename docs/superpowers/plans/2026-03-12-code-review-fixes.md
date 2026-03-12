@@ -1173,9 +1173,17 @@ This chunk adds a comment documenting the asymmetry between begin() and end().
 **Files:**
 - Modify: `src/AMQP10/Connection/Session.php:35`
 
-- [ ] **Step 1: Add comment above end() method**
+- [ ] **Step 1: Read current Session end() method**
 
-Replace line 35-41 with:
+```bash
+cat src/AMQP10/Connection/Session.php | sed -n '35,41p'
+```
+
+Expected: Should see the current end() method implementation
+
+- [ ] **Step 2: Add comment above end() method**
+
+Replace lines 35-41 with:
 
 ```php
     /**
@@ -1189,6 +1197,21 @@ Replace line 35-41 with:
             $this->open = false;
         }
     }
+```
+
+- [ ] **Step 3: Run tests to verify no regressions**
+
+```bash
+vendor/bin/phpunit
+```
+
+Expected: All tests pass
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/AMQP10/Connection/Session.php
+git commit -m "docs: add comment documenting begin()/end() asymmetry"
 ```
 
 - [ ] **Step 2: Run tests to verify no regressions**
