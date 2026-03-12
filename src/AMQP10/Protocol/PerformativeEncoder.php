@@ -76,6 +76,7 @@ class PerformativeEncoder
         int     $rcvSettleMode           = self::RCV_FIRST,
         ?array  $properties              = null,
         ?int    $initialDeliveryCount    = null,
+        ?string $filterMap               = null,
     ): string {
         $fields = [
             TypeEncoder::encodeString($name),
@@ -83,7 +84,7 @@ class PerformativeEncoder
             TypeEncoder::encodeBool($role),
             TypeEncoder::encodeUbyte($sndSettleMode),
             TypeEncoder::encodeUbyte($rcvSettleMode),
-            self::encodeSource($source),
+            self::encodeSource($source, $filterMap),
             self::encodeTarget($target),
             TypeEncoder::encodeNull(), // unsettled
             TypeEncoder::encodeNull(), // incomplete-unsettled
@@ -215,14 +216,27 @@ class PerformativeEncoder
         );
     }
 
-    private static function encodeSource(?string $address): string
+    private static function encodeSource(?string $address, ?string $filterMap = null): string
     {
         if ($address === null) {
             return TypeEncoder::encodeNull();
         }
-        $fields = [TypeEncoder::encodeString($address)];
+        if ($filterMap === null) {
+            $fields = [TypeEncoder::encodeString($address)];
+        } else {
+            $fields = [
+                TypeEncoder::encodeString($address),
+                TypeEncoder::encodeNull(),
+                TypeEncoder::encodeNull(),
+                TypeEncoder::encodeNull(),
+                TypeEncoder::encodeNull(),
+                TypeEncoder::encodeNull(),
+                TypeEncoder::encodeNull(),
+                $filterMap,
+            ];
+        }
         return TypeEncoder::encodeDescribed(
-            TypeEncoder::encodeUlong(0x28), // source descriptor
+            TypeEncoder::encodeUlong(0x28),
             TypeEncoder::encodeList($fields),
         );
     }

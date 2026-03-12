@@ -132,4 +132,16 @@ class TypeEncoderTest extends TestCase
         $value = TypeEncoder::encodeNull();            // "\x40"
         $this->assertSame("\x00\x53\x10\x40", TypeEncoder::encodeDescribed($descriptor, $value));
     }
+
+    public function test_encode_timestamp(): void
+    {
+        $encoded = TypeEncoder::encodeTimestamp(1_700_000_000_000);
+        $this->assertSame(0x83, ord($encoded[0]));
+        $this->assertSame(9, strlen($encoded));
+
+        $high = unpack('N', substr($encoded, 1, 4))[1];
+        $low  = unpack('N', substr($encoded, 5, 4))[1];
+        $decoded = ($high << 32) | $low;
+        $this->assertSame(1_700_000_000_000, $decoded);
+    }
 }
