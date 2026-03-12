@@ -4,6 +4,7 @@ namespace AMQP10\Tests\Connection;
 
 use AMQP10\Connection\Session;
 use AMQP10\Protocol\Descriptor;
+use AMQP10\Protocol\FrameBuilder;
 use AMQP10\Protocol\FrameParser;
 use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeDecoder;
@@ -110,5 +111,60 @@ class SessionTest extends TestCase
 
         $result = $session->nextFrame();
         $this->assertNull($result);
+    }
+
+    public function test_readFrameOfType_uses_cached_descriptor(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        // Queue multiple frames of different types
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'sender', handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER, source: null, target: '/q/test',
+        ));
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 1));
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'receiver', handle: 1,
+            role: PerformativeEncoder::ROLE_SENDER, source: '/q/test2', target: null,
+        ));
+
+        // Read a specific frame type - should use cached descriptor
+        $frame = $session->readFrameOfType(Descriptor::BEGIN);
+
+        // Verify we got the right frame
+        $this->assertNotNull($frame);
+        $body = FrameParser::extractBody($frame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::BEGIN, $performative['descriptor']);
+
+        // Read an ATTACH frame - should find it via cached descriptor
+        $attachFrame = $session->readFrameOfType(Descriptor::ATTACH);
+        $this->assertNotNull($attachFrame);
+        $body = FrameParser::extractBody($attachFrame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::ATTACH, $performative['descriptor']);
+    }
+
+    public function test_pendingFrames_handles_malformed_frame(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        // Manually queue a malformed frame that cannot be decoded
+        $malformedFrame = FrameBuilder::amqp(channel: 0, body: "\x00\x00\x00\x00");
+        $mock->queueIncoming($malformedFrame);
+
+        // Reading a malformed frame should throw an exception
+        $this->expectException(\AMQP10\Exception\FrameException::class);
+        $session->nextFrame();
     }
 }
