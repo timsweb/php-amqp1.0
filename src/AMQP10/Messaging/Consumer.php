@@ -73,7 +73,7 @@ class Consumer
             if ($frame === null) {
                 break;
             }
-            if ($this->isTransferFrame($frame)) {
+            if ($this->getFrameDescriptor($frame) === Descriptor::TRANSFER) {
                 $this->handleTransfer($frame, $handler, $errorHandler);
             }
         }
@@ -84,11 +84,11 @@ class Consumer
         }
     }
 
-    private function isTransferFrame(string $frame): bool
+    private function getFrameDescriptor(string $frame): ?int
     {
         $body        = FrameParser::extractBody($frame);
         $performative = (new TypeDecoder($body))->decode();
-        return is_array($performative) && ($performative['descriptor'] ?? null) === Descriptor::TRANSFER;
+        return is_array($performative) ? ($performative['descriptor'] ?? null) : null;
     }
 
     private function handleTransfer(string $frame, ?\Closure $handler, ?\Closure $errorHandler): void
