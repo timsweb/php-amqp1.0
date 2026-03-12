@@ -4,8 +4,9 @@ namespace AMQP10\Management;
 use AMQP10\Connection\ReceiverLink;
 use AMQP10\Connection\SenderLink;
 use AMQP10\Connection\Session;
-use AMQP10\Exception\BindingException;
+use AMQP10\Exception\ExchangeNotFoundException;
 use AMQP10\Exception\ManagementException;
+use AMQP10\Exception\QueueNotFoundException;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\MessageDecoder;
 use AMQP10\Messaging\MessageEncoder;
@@ -51,14 +52,14 @@ class Management
             'auto_delete' => $spec->autoDelete,
         ]);
         $response = $this->request('PUT', $path, $body);
-        $this->assertSuccess($response, [200, 201]);
+        $this->assertSuccess($response, [200, 201], $path);
     }
 
     public function deleteExchange(string $name): void
     {
         $path     = '/exchanges/' . rawurlencode($name);
         $response = $this->request('DELETE', $path);
-        $this->assertSuccess($response, [200, 204]);
+        $this->assertSuccess($response, [200, 204], $path);
     }
 
     public function declareQueue(QueueSpecification $spec): void
@@ -69,14 +70,14 @@ class Management
             'arguments' => ['x-queue-type' => $spec->type->value],
         ]);
         $response = $this->request('PUT', $path, $body);
-        $this->assertSuccess($response, [200, 201]);
+        $this->assertSuccess($response, [200, 201], $path);
     }
 
     public function deleteQueue(string $name): void
     {
         $path     = '/queues/' . rawurlencode($name);
         $response = $this->request('DELETE', $path);
-        $this->assertSuccess($response, [200, 204]);
+        $this->assertSuccess($response, [200, 204], $path);
     }
 
     public function bind(BindingSpecification $spec): void
@@ -89,7 +90,7 @@ class Management
             'routing_key'      => $spec->bindingKey ?? '',
         ]);
         $response = $this->request('POST', $path, $body);
-        $this->assertSuccess($response, [200, 201]);
+        $this->assertSuccess($response, [200, 201], $path);
     }
 
     public function close(): void
@@ -127,7 +128,7 @@ class Management
             if (empty($frames)) {
                 $data = $transport->read(4096);
                 if ($data === null) {
-                    throw new BindingException('Connection closed awaiting management response');
+                    throw new ManagementException('Connection closed awaiting management response');
                 }
                 if ($data !== '') {
                     $this->parser->feed($data);
@@ -176,12 +177,21 @@ class Management
         }
     }
 
-    private function assertSuccess(array $response, array $expected): void
+    private function assertSuccess(array $response, array $expected, string $path = ''): void
     {
-        if (!in_array($response['status'], $expected, true)) {
-            throw new BindingException(
-                "Management request failed with status {$response['status']}: {$response['body']}"
-            );
+        if (in_array($response['status'], $expected, true)) {
+            return;
         }
+        $status = $response['status'];
+        $body   = $response['body'];
+        if ($status === 404) {
+            if (str_starts_with($path, '/queues/')) {
+                throw new QueueNotFoundException("Queue not found: $body");
+            }
+            if (str_starts_with($path, '/exchanges/')) {
+                throw new ExchangeNotFoundException("Exchange not found: $body");
+            }
+        }
+        throw new ManagementException("Management request failed with status $status: $body");
     }
 }
