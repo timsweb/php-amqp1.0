@@ -11,7 +11,7 @@
     },
     "autoload": {
         "psr-4": {
-            "AMQP10\\": "src/"
+            "AMQP10\\": "src/AMQP10/"
         }
     },
     "autoload-dev": {

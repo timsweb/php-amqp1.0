@@ -70,11 +70,12 @@ class PerformativeEncoder
         string  $name,
         int     $handle,
         bool    $role,
-        ?string $source        = null,
-        ?string $target        = null,
-        int     $sndSettleMode = self::SND_UNSETTLED,
-        int     $rcvSettleMode = self::RCV_FIRST,
-        ?array  $properties    = null,
+        ?string $source                  = null,
+        ?string $target                  = null,
+        int     $sndSettleMode           = self::SND_UNSETTLED,
+        int     $rcvSettleMode           = self::RCV_FIRST,
+        ?array  $properties              = null,
+        ?int    $initialDeliveryCount    = null,
     ): string {
         $fields = [
             TypeEncoder::encodeString($name),
@@ -84,6 +85,17 @@ class PerformativeEncoder
             TypeEncoder::encodeUbyte($rcvSettleMode),
             self::encodeSource($source),
             self::encodeTarget($target),
+            TypeEncoder::encodeNull(), // unsettled
+            TypeEncoder::encodeNull(), // incomplete-unsettled
+            $initialDeliveryCount !== null
+                ? TypeEncoder::encodeUint($initialDeliveryCount)
+                : TypeEncoder::encodeNull(),
+            TypeEncoder::encodeNull(), // max-message-size
+            TypeEncoder::encodeNull(), // offered-capabilities
+            TypeEncoder::encodeNull(), // desired-capabilities
+            $properties !== null
+                ? TypeEncoder::encodeMap($properties)
+                : TypeEncoder::encodeNull(),
         ];
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::ATTACH, $fields));
     }

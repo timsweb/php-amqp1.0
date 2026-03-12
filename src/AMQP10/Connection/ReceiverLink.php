@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace AMQP10\Connection;
 
 use AMQP10\Protocol\PerformativeEncoder;
+use AMQP10\Protocol\TypeEncoder;
 
 /**
  * An AMQP 1.0 receiver link (role=receiver, used for consuming).
@@ -17,19 +18,27 @@ class ReceiverLink
         private readonly Session $session,
         private readonly string  $name,
         private readonly string  $source,
-        private readonly int     $initialCredit = 10,
+        private readonly ?string $target         = null,
+        private readonly int     $initialCredit  = 10,
+        private readonly bool    $managementLink = false,
     ) {
         $this->handle = $session->allocateHandle();
     }
 
     public function attach(): void
     {
+        $properties = $this->managementLink
+            ? [TypeEncoder::encodeSymbol('paired') => TypeEncoder::encodeBool(true)]
+            : null;
+
         $this->session->transport()->send(PerformativeEncoder::attach(
-            channel: $this->session->channel(),
-            name:    $this->name,
-            handle:  $this->handle,
-            role:    PerformativeEncoder::ROLE_RECEIVER,
-            source:  $this->source,
+            channel:    $this->session->channel(),
+            name:       $this->name,
+            handle:     $this->handle,
+            role:       PerformativeEncoder::ROLE_RECEIVER,
+            source:     $this->source,
+            target:     $this->target,
+            properties: $properties,
         ));
         $this->attached = true;
         $this->grantCredit($this->initialCredit);

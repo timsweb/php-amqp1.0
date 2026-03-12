@@ -10,9 +10,9 @@ use AMQP10\Management\ExchangeType;
 use AMQP10\Management\Management;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
-use AMQP10\Messaging\Message;
-use AMQP10\Messaging\MessageEncoder;
+use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\PerformativeEncoder;
+use AMQP10\Protocol\TypeEncoder;
 use AMQP10\Tests\Mocks\TransportMock;
 use PHPUnit\Framework\TestCase;
 
@@ -30,10 +30,12 @@ class ManagementTest extends TestCase
         $mock->clearSent();
 
         // Queue ATTACH responses for sender + receiver links.
+        // Management now uses a random shared link name; the mock just needs
+        // to queue two ATTACH frames (names are irrelevant in the mock).
         // These will be consumed (and skipped as non-TRANSFER frames) during awaitResponse.
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'management-sender',
+            name:    'management-link',
             handle:  0,
             role:    PerformativeEncoder::ROLE_RECEIVER, // server's perspective
             source:  null,
@@ -41,10 +43,10 @@ class ManagementTest extends TestCase
         ));
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'management-receiver',
+            name:    'management-link',
             handle:  1,
             role:    PerformativeEncoder::ROLE_SENDER, // server's perspective
-            source:  '/management/reply',
+            source:  '/management',
             target:  null,
         ));
 
@@ -56,15 +58,36 @@ class ManagementTest extends TestCase
 
     /**
      * Queue a management response as a TRANSFER frame carrying a message
-     * with the given correlation-id and HTTP-status subject.
+     * with the given correlation-id and HTTP-status in AMQP properties section.
+     *
+     * RabbitMQ management responses use AMQP properties (not application-properties):
+     *   properties.subject        = HTTP status code string
+     *   properties.correlation_id = the request message-id
+     * Body is encoded as a data section or amqp-value section.
      */
     private function queueManagementResponse(TransportMock $mock, string $correlationId, int $status, string $body = ''): void
     {
-        $msg = new Message($body, applicationProperties: [
-            'subject'        => (string) $status,
-            'correlation-id' => $correlationId,
-        ]);
-        $payload     = MessageEncoder::encode($msg);
+        // Properties list fields (spec §3.2.4):
+        // [0]=message-id [1]=user-id [2]=to [3]=subject [4]=reply-to [5]=correlation-id
+        $propsFields = [
+            TypeEncoder::encodeNull(),                       // message-id
+            TypeEncoder::encodeNull(),                       // user-id
+            TypeEncoder::encodeNull(),                       // to
+            TypeEncoder::encodeString((string) $status),     // subject (= HTTP status code)
+            TypeEncoder::encodeNull(),                       // reply-to
+            TypeEncoder::encodeString($correlationId),       // correlation-id
+        ];
+        $propertiesSection = TypeEncoder::encodeDescribed(
+            TypeEncoder::encodeUlong(Descriptor::MSG_PROPERTIES),
+            TypeEncoder::encodeList($propsFields),
+        );
+
+        $dataSection = TypeEncoder::encodeDescribed(
+            TypeEncoder::encodeUlong(Descriptor::MSG_DATA),
+            TypeEncoder::encodeBinary($body),
+        );
+
+        $payload     = $propertiesSection . $dataSection;
         $deliveryTag = pack('N', 0);
         $mock->queueIncoming(PerformativeEncoder::transfer(
             channel:        0,

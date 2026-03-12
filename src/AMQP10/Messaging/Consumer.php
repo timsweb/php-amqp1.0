@@ -49,7 +49,13 @@ class Consumer
             }
         }
 
-        $this->link->detach();
+        // Attempt to send DETACH. If the transport is already closed (e.g. the caller
+        // disconnected inside a handler to break the loop), ignore the error gracefully.
+        try {
+            $this->link->detach();
+        } catch (\Throwable) {
+            // Transport already closed — DETACH cannot be sent, which is acceptable.
+        }
     }
 
     private function isTransferFrame(string $frame): bool

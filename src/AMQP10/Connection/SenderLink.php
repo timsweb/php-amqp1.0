@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace AMQP10\Connection;
 
 use AMQP10\Protocol\PerformativeEncoder;
+use AMQP10\Protocol\TypeEncoder;
 
 /**
  * An AMQP 1.0 sender link (role=sender, used for publishing).
@@ -17,20 +18,32 @@ class SenderLink
         private readonly Session $session,
         private readonly string  $name,
         private readonly string  $target,
-        private readonly int     $sndSettleMode = PerformativeEncoder::SND_UNSETTLED,
+        private readonly ?string $source         = null,
+        private readonly int     $sndSettleMode  = PerformativeEncoder::SND_UNSETTLED,
+        private readonly bool    $managementLink = false,
     ) {
         $this->handle = $session->allocateHandle();
     }
 
     public function attach(): void
     {
+        $properties = $this->managementLink
+            ? [TypeEncoder::encodeSymbol('paired') => TypeEncoder::encodeBool(true)]
+            : null;
+
+        // initial_delivery_count is required for all sender links (AMQP spec §2.7.3)
+        $initialDeliveryCount = 0;
+
         $this->session->transport()->send(PerformativeEncoder::attach(
-            channel:       $this->session->channel(),
-            name:          $this->name,
-            handle:        $this->handle,
-            role:          PerformativeEncoder::ROLE_SENDER,
-            target:        $this->target,
-            sndSettleMode: $this->sndSettleMode,
+            channel:              $this->session->channel(),
+            name:                 $this->name,
+            handle:               $this->handle,
+            role:                 PerformativeEncoder::ROLE_SENDER,
+            source:               $this->source,
+            target:               $this->target,
+            sndSettleMode:        $this->sndSettleMode,
+            properties:           $properties,
+            initialDeliveryCount: $initialDeliveryCount,
         ));
         $this->attached = true;
     }
