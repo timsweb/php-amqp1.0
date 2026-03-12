@@ -236,7 +236,7 @@ class PerformativeEncoder
             ];
         }
         return TypeEncoder::encodeDescribed(
-            TypeEncoder::encodeUlong(0x28),
+            TypeEncoder::encodeUlong(Descriptor::SOURCE), // source descriptor
             TypeEncoder::encodeList($fields),
         );
     }
@@ -248,7 +248,7 @@ class PerformativeEncoder
         }
         $fields = [TypeEncoder::encodeString($address)];
         return TypeEncoder::encodeDescribed(
-            TypeEncoder::encodeUlong(0x29), // target descriptor
+            TypeEncoder::encodeUlong(Descriptor::TARGET), // target descriptor
             TypeEncoder::encodeList($fields),
         );
     }
