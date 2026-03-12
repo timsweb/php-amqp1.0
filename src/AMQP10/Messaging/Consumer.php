@@ -4,6 +4,7 @@ namespace AMQP10\Messaging;
 
 use AMQP10\Connection\ReceiverLink;
 use AMQP10\Connection\Session;
+use AMQP10\Exception\FrameException;
 use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\FrameParser;
 use AMQP10\Protocol\TypeDecoder;
@@ -86,9 +87,13 @@ class Consumer
 
     private function getFrameDescriptor(string $frame): ?int
     {
-        $body        = FrameParser::extractBody($frame);
-        $performative = (new TypeDecoder($body))->decode();
-        return is_array($performative) ? ($performative['descriptor'] ?? null) : null;
+        $body = FrameParser::extractBody($frame);
+        try {
+            $performative = (new TypeDecoder($body))->decode();
+            return is_array($performative) ? ($performative['descriptor'] ?? null) : null;
+        } catch (FrameException $e) {
+            return null;
+        }
     }
 
     private function handleTransfer(string $frame, ?\Closure $handler, ?\Closure $errorHandler): void

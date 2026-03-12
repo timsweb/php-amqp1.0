@@ -214,4 +214,44 @@ class ConsumerTest extends TestCase
 
         $this->assertTrue(true); // no exception = pass
     }
+
+    public function test_getFrameDescriptor_returns_transfer_descriptor(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1);
+
+        $messagePayload = MessageEncoder::encode(new Message('test'));
+        $transferFrame = PerformativeEncoder::transfer(
+            channel:        0,
+            handle:         0,
+            deliveryId:     0,
+            deliveryTag:    pack('N', 0),
+            messagePayload: $messagePayload,
+            settled:        false,
+        );
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('getFrameDescriptor');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer, $transferFrame);
+
+        $this->assertSame(Descriptor::TRANSFER, $result);
+    }
+
+    public function test_getFrameDescriptor_handles_malformed_frame(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1);
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('getFrameDescriptor');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer, '');
+
+        $this->assertNull($result);
+    }
 }
