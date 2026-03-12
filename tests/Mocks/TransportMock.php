@@ -6,9 +6,10 @@ use AMQP10\Transport\TransportInterface;
 
 class TransportMock implements TransportInterface
 {
-    private bool   $connected = false;
-    private string $incoming  = '';
-    private string $outgoing  = '';
+    private bool   $connected      = false;
+    private string $incoming       = '';
+    private string $outgoing       = '';
+    private bool   $emptyReadMode  = false;
 
     public function connect(string $uri): void
     {
@@ -25,8 +26,16 @@ class TransportMock implements TransportInterface
         $this->outgoing .= $bytes;
     }
 
+    public function setEmptyReadMode(bool $emptyForever = true): void
+    {
+        $this->emptyReadMode = $emptyForever;
+    }
+
     public function read(int $length = 4096): ?string
     {
+        if ($this->emptyReadMode) {
+            return '';
+        }
         if (!$this->connected || $this->incoming === '') {
             return '';
         }

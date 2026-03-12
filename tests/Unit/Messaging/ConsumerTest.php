@@ -279,11 +279,8 @@ class ConsumerTest extends TestCase
         $key = array_key_first($map);
         $value = $map[$key];
 
-        $this->assertIsArray($value);
-        $this->assertArrayHasKey('descriptor', $value);
-        $this->assertSame('rabbitmq:stream-offset-spec', $value['descriptor']);
-        $this->assertArrayHasKey('value', $value);
-        $this->assertSame(5, $value['value']);
+        // Raw ulong value — not wrapped in a described type (required by RabbitMQ 4.x)
+        $this->assertSame(5, $value);
     }
 
     public function test_buildFilterMap_with_filterSql(): void
@@ -309,11 +306,8 @@ class ConsumerTest extends TestCase
         $key = array_key_first($map);
         $value = $map[$key];
 
-        $this->assertIsArray($value);
-        $this->assertArrayHasKey('descriptor', $value);
-        $this->assertSame('apache.org:selector-filter:string', $value['descriptor']);
-        $this->assertArrayHasKey('value', $value);
-        $this->assertSame("color = 'red'", $value['value']);
+        // Raw string value — not wrapped in a described type (required by RabbitMQ 4.x)
+        $this->assertSame("color = 'red'", $value);
     }
 
     public function test_buildFilterMap_with_offset_and_filterSql(): void

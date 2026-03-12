@@ -22,7 +22,7 @@ class ReceiverLink
         private readonly ?string  $target         = null,
         private readonly int      $initialCredit  = 10,
         private readonly bool     $managementLink = false,
-        /** @var string|null Pre-encoded AMQP binary filter map for source terminus */
+        // Pre-encoded AMQP binary filter map for source terminus (TypeEncoder::encodeMap output), or null.
         private readonly ?string  $filterMap      = null,
     ) {
         $this->handle = $session->allocateHandle();

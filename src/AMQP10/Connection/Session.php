@@ -106,6 +106,7 @@ class Session
                         'Timeout awaiting frame with descriptor 0x' . dechex($descriptor)
                     );
                 }
+                usleep(1000);
                 continue;
             }
             $consecutiveEmptyReads = 0;
@@ -123,6 +124,11 @@ class Session
         }
     }
 
+    /**
+     * Returns the next available frame, or null when no frame is immediately available
+     * OR when the transport is closed. Callers must check transport()->isConnected() to
+     * distinguish between "momentarily quiet" and "genuinely closed".
+     */
     public function nextFrame(): ?string
     {
         if (!empty($this->pendingFrames)) {

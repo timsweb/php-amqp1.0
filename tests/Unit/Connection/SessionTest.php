@@ -170,7 +170,13 @@ class SessionTest extends TestCase
 
     public function test_readFrameOfType_throws_on_consecutive_empty_reads(): void
     {
-        $this->markTestIncomplete('TransportMock cannot yet mock consecutive read() calls to simulate timeout');
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->setEmptyReadMode(true);
+        $session = new Session($mock, channel: 0);
+
+        $this->expectException(\RuntimeException::class);
+        $session->readFrameOfType(Descriptor::BEGIN);
     }
 
     public function test_readFrameOfType_timeout_logic_exists(): void

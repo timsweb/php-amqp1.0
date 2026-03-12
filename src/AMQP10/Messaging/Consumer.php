@@ -46,19 +46,14 @@ class Consumer
                 'timestamp'             => TypeEncoder::encodeTimestamp((int) $this->offset->value),
                 default                 => TypeEncoder::encodeSymbol('first'),
             };
-            $pairs[TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec')] =
-                TypeEncoder::encodeDescribed(
-                    TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec'),
-                    $offsetValue,
-                );
+            // Raw values (not described types) per the filter encoding RabbitMQ 4.x currently honours.
+            // RabbitMQ logs this as "amqp_filter_set_bug" compat mode; revisit when that mode is removed.
+            $pairs[TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec')] = $offsetValue;
         }
 
         if ($this->filterSql !== null) {
             $pairs[TypeEncoder::encodeSymbol('apache.org:selector-filter:string')] =
-                TypeEncoder::encodeDescribed(
-                    TypeEncoder::encodeSymbol('apache.org:selector-filter:string'),
-                    TypeEncoder::encodeString($this->filterSql),
-                );
+                TypeEncoder::encodeString($this->filterSql);
         }
 
         return TypeEncoder::encodeMap($pairs);
@@ -86,6 +81,9 @@ class Consumer
 
     private function getFrameDescriptor(string $frame): ?int
     {
+        if (strlen($frame) < 8) {
+            return null;
+        }
         $body = FrameParser::extractBody($frame);
         try {
             $performative = (new TypeDecoder($body))->decode();
