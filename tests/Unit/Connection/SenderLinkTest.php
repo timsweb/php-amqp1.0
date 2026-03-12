@@ -15,7 +15,8 @@ class SenderLinkTest extends TestCase
 {
     private function makeSession(): array
     {
-        $mock    = new TransportMock();
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
         $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
         $session = new Session($mock, channel: 0);
         $session->begin();
@@ -60,5 +61,15 @@ class SenderLinkTest extends TestCase
         $this->assertNotEmpty($frames);
         $performative = (new TypeDecoder(FrameParser::extractBody($frames[0])))->decode();
         $this->assertSame(Descriptor::DETACH, $performative['descriptor']);
+    }
+
+    public function test_attach_throws_when_server_does_not_respond(): void
+    {
+        $mock    = new TransportMock();
+        $session = new Session($mock, channel: 0);
+        $link    = new SenderLink($session, name: 'l', target: '/queues/test');
+
+        $this->expectException(\RuntimeException::class);
+        $link->attach();
     }
 }

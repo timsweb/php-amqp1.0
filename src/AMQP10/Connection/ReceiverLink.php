@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace AMQP10\Connection;
 
+use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeEncoder;
 
@@ -40,6 +41,7 @@ class ReceiverLink
             target:     $this->target,
             properties: $properties,
         ));
+        $this->session->readFrameOfType(Descriptor::ATTACH);
         $this->attached = true;
         $this->grantCredit($this->initialCredit);
     }
