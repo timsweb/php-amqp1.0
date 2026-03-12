@@ -1044,6 +1044,83 @@ grep -r "filterValues" --include="*.php" tests/
 
 Expected: Only found in Consumer.php and ConsumerBuilder.php definitions, no actual usage
 
+- [ ] **Step 2: Read Consumer constructor to understand current state**
+
+```bash
+cat src/AMQP10/Messaging/Consumer.php
+```
+
+Note: The $filterValues parameter is a constructor parameter (line 22) that is never used anywhere in the class. It should be completely removed.
+
+- [ ] **Step 3: Remove $filterValues from Consumer constructor**
+
+Remove the entire parameter line from `src/AMQP10/Messaging/Consumer.php` (approximately line 22):
+
+```php
+        private readonly array    $filterValues = [],
+```
+
+Also verify no code uses `$this->filterValues` anywhere in the file.
+
+- [ ] **Step 4: Read ConsumerBuilder to understand current state**
+
+```bash
+cat src/AMQP10/Messaging/ConsumerBuilder.php
+```
+
+- [ ] **Step 5: Remove filterValues method from ConsumerBuilder**
+
+Remove the entire method from `src/AMQP10/Messaging/ConsumerBuilder.php` (approximately lines 56-60):
+
+```php
+    public function filterValues(string ...$values): self
+    {
+        $this->filterValues = $values;
+        return $this;
+    }
+```
+
+- [ ] **Step 6: Remove filterValues property from ConsumerBuilder**
+
+Remove the property line from `src/AMQP10/Messaging/ConsumerBuilder.php` (approximately line 14):
+
+```bash
+private array     $filterValues = [];
+```
+
+- [ ] **Step 7: Remove filterValues from ConsumerBuilder::run()**
+
+Remove the parameter from the Consumer constructor call in `src/AMQP10/Messaging/ConsumerBuilder.php::run()` (approximately line 70):
+
+```php
+            $this->filterValues,
+```
+
+- [ ] **Step 8: Search for any documentation or examples**
+
+```bash
+grep -r "filterValues" --include="*.md" . --include="*.txt" .
+```
+
+Expected: No usage in documentation
+
+- [ ] **Step 9: Run tests to verify no regressions**
+
+```bash
+vendor/bin/phpunit
+```
+
+Expected: All tests pass (including tests from previous chunks that reference filterValues)
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add src/AMQP10/Messaging/Consumer.php src/AMQP10/Messaging/ConsumerBuilder.php
+git commit -m "refactor: remove unused filterValues parameter from Consumer and ConsumerBuilder"
+```
+
+Expected: Only found in Consumer.php and ConsumerBuilder.php definitions, no actual usage
+
 - [ ] **Step 2: Remove $filterValues from Consumer**
 
 Modify `src/AMQP10/Messaging/Consumer.php`:
