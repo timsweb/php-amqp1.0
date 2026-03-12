@@ -1240,10 +1240,10 @@ This chunk validates the O(n²) → O(n) improvement from Issue #2 fix. This is 
 **Files:**
 - Create: `benchmark/pending-frames-performance.php`
 
-- [ ] **Step 1: Create benchmark script**
+- [ ] **Step 1: Create benchmark directory**
 
 ```bash
-mkdir -p benchmark
+mkdir -p benchmark || { echo "Failed to create benchmark directory"; exit 1; }
 ```
 
 Create `benchmark/pending-frames-performance.php`:
