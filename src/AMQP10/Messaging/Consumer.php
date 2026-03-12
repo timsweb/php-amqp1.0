@@ -20,7 +20,6 @@ class Consumer
         private readonly int      $credit       = 10,
         private readonly ?Offset  $offset       = null,
         private readonly ?string  $filterSql    = null,
-        private readonly array    $filterValues = [],
     ) {
         $linkName   = 'receiver-' . bin2hex(random_bytes(4));
         $this->link = new ReceiverLink(
