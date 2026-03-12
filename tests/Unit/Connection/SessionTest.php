@@ -14,7 +14,8 @@ class SessionTest extends TestCase
 {
     private function makeOpenSession(): array
     {
-        $mock    = new TransportMock();
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
         $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
         $session = new Session($mock, channel: 0);
         $session->begin();
@@ -58,5 +59,56 @@ class SessionTest extends TestCase
         $this->assertNotEmpty($frames);
         $performative = (new TypeDecoder(FrameParser::extractBody($frames[0])))->decode();
         $this->assertSame(Descriptor::END, $performative['descriptor']);
+    }
+
+    public function test_begin_awaits_server_begin_response(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+
+        $session->begin();
+
+        $this->assertTrue($session->isOpen());
+    }
+
+    public function test_begin_throws_when_transport_closes_before_response(): void
+    {
+        $mock    = new TransportMock();
+        $session = new Session($mock, channel: 0);
+
+        $this->expectException(\RuntimeException::class);
+        $session->begin();
+    }
+
+    public function test_readFrameOfType_buffers_non_matching_frames(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::open('container-1'));
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+
+        $session->begin();
+        $this->assertTrue($session->isOpen());
+
+        $frame = $session->nextFrame();
+        $this->assertNotNull($frame);
+        $body        = FrameParser::extractBody($frame);
+        $performative = (new TypeDecoder($body))->decode();
+        $this->assertSame(Descriptor::OPEN, $performative['descriptor']);
+    }
+
+    public function test_nextFrame_returns_null_when_no_more_data(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+
+        $result = $session->nextFrame();
+        $this->assertNull($result);
     }
 }
