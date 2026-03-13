@@ -5,6 +5,7 @@ namespace AMQP10\Tests\Messaging;
 use AMQP10\Connection\Session;
 use AMQP10\Messaging\Consumer;
 use AMQP10\Messaging\ConsumerBuilder;
+use AMQP10\Messaging\Delivery;
 use AMQP10\Messaging\DeliveryContext;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\MessageEncoder;
@@ -356,6 +357,86 @@ class ConsumerTest extends TestCase
         $result = $method->invoke($consumer);
 
         $this->assertNull($result);
+    }
+
+    public function test_receive_returns_delivery(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
+        $mock->queueIncoming($this->makeTransferFrame(0, 'hello', deliveryId: 0));
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, idleTimeout: 0.05);
+        $delivery = $consumer->receive();
+
+        $this->assertNotNull($delivery);
+        $this->assertInstanceOf(\AMQP10\Messaging\Delivery::class, $delivery);
+        $this->assertSame('hello', $delivery->message()->body());
+        $this->assertInstanceOf(DeliveryContext::class, $delivery->context());
+
+        $consumer->close();
+    }
+
+    public function test_receive_returns_null_on_timeout(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, idleTimeout: 0.05);
+        $delivery = $consumer->receive();
+
+        $this->assertNull($delivery);
+        $consumer->close();
+    }
+
+    public function test_receive_multiple(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
+        $mock->queueIncoming($this->makeTransferFrame(0, 'first',  deliveryId: 0));
+        $mock->queueIncoming($this->makeTransferFrame(0, 'second', deliveryId: 1));
+
+        $consumer = new Consumer($session, '/queues/test', credit: 10, idleTimeout: 0.05);
+        $d1 = $consumer->receive();
+        $d2 = $consumer->receive();
+
+        $this->assertSame('first',  $d1->message()->body());
+        $this->assertSame('second', $d2->message()->body());
+        $consumer->close();
+    }
+
+    public function test_consumer_builder_consumer_method(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
+        $mock->queueIncoming($this->makeTransferFrame(0, 'via-builder', deliveryId: 0));
+
+        $builder  = new ConsumerBuilder($session, '/queues/test', idleTimeout: 0.05);
+        $consumer = $builder->consumer();
+        $delivery = $consumer->receive();
+
+        $this->assertNotNull($delivery);
+        $this->assertSame('via-builder', $delivery->message()->body());
+        $consumer->close();
     }
 
     public function test_run_returns_on_idle_timeout(): void

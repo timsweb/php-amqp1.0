@@ -13,6 +13,7 @@ use AMQP10\Protocol\TypeEncoder;
 class Consumer
 {
     private readonly ReceiverLink $link;
+    private bool $attached = false;
 
     public function __construct(
         private readonly Session  $session,
@@ -61,29 +62,56 @@ class Consumer
         return TypeEncoder::encodeMap($pairs);
     }
 
-    public function run(?\Closure $handler, ?\Closure $errorHandler = null): void
+    private function ensureAttached(): void
     {
-        $this->link->attach();
+        if (!$this->attached) {
+            $this->link->attach();
+            $this->attached = true;
+        }
+    }
+
+    public function receive(): ?Delivery
+    {
+        $this->ensureAttached();
 
         $deadline = microtime(true) + $this->idleTimeout;
         while (true) {
             $frame = $this->session->nextFrame();
             if ($frame === null) {
                 if (!$this->session->transport()->isConnected()) {
-                    break;
+                    return null;
                 }
                 if (microtime(true) >= $deadline) {
-                    break;
+                    return null;
                 }
                 usleep(1000);
                 continue;
             }
             if ($this->getFrameDescriptor($frame) === Descriptor::TRANSFER) {
-                $deadline = microtime(true) + $this->idleTimeout;
-                $this->handleTransfer($frame, $handler, $errorHandler);
+                return $this->extractDelivery($frame);
+            }
+        }
+    }
+
+    public function run(?\Closure $handler, ?\Closure $errorHandler = null): void
+    {
+        while ($delivery = $this->receive()) {
+            if ($handler !== null) {
+                try {
+                    $handler($delivery->message(), $delivery->context());
+                } catch (\Throwable $e) {
+                    if ($errorHandler !== null) {
+                        $errorHandler($e);
+                    }
+                }
             }
         }
 
+        $this->close();
+    }
+
+    public function close(): void
+    {
         try {
             $this->link->detach();
         } catch (\Throwable) {
@@ -104,7 +132,7 @@ class Consumer
         }
     }
 
-    private function handleTransfer(string $frame, ?\Closure $handler, ?\Closure $errorHandler): void
+    private function extractDelivery(string $frame): Delivery
     {
         $body         = FrameParser::extractBody($frame);
         $decoder      = new TypeDecoder($body);
@@ -115,14 +143,6 @@ class Consumer
         $message        = MessageDecoder::decode($messagePayload);
         $ctx            = new DeliveryContext($deliveryId, $this->link);
 
-        if ($handler !== null) {
-            try {
-                $handler($message, $ctx);
-            } catch (\Throwable $e) {
-                if ($errorHandler !== null) {
-                    $errorHandler($e);
-                }
-            }
-        }
+        return new Delivery($message, $ctx);
     }
 }
