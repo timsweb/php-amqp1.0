@@ -22,6 +22,7 @@ class Consumer
         private readonly ?Offset  $offset           = null,
         private readonly ?string  $filterJms        = null,
         private readonly ?string  $filterAmqpSql    = null,
+        /** @var ?array<string> */
         private readonly ?array   $filterBloomValues = null,
         private readonly bool     $matchUnfiltered   = false,
         private readonly float    $idleTimeout      = 30.0,
