@@ -180,7 +180,6 @@ class Management
                 if (!$this->session->transport()->isConnected()) {
                     throw new ManagementException('Connection closed awaiting management response');
                 }
-                usleep(1000);
                 continue;
             }
 

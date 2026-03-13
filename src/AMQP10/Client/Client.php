@@ -3,20 +3,21 @@ declare(strict_types=1);
 
 namespace AMQP10\Client;
 
-use AMQP10\Connection\AutoReconnect;
 use AMQP10\Connection\Connection;
 use AMQP10\Connection\Sasl;
 use AMQP10\Connection\Session;
 use AMQP10\Management\Management;
 use AMQP10\Messaging\ConsumerBuilder;
 use AMQP10\Messaging\PublisherBuilder;
-use AMQP10\Transport\BlockingAdapter;
+use AMQP10\Transport\RevoltTransport;
 use AMQP10\Transport\TransportInterface;
 
 class Client
 {
-    private ?Connection $connection = null;
-    private ?Session    $session    = null;
+    private ?Connection         $connection      = null;
+    private ?Session            $session         = null;
+    /** @phpstan-ignore-next-line */
+    private ?TransportInterface $activeTransport = null;
 
     public function __construct(
         private readonly string $uri,
@@ -29,19 +30,14 @@ class Client
      */
     public function connect(): static
     {
-        $transport  = $this->transport ?? new BlockingAdapter(timeout: $this->config->timeout);
-        $connection = new Connection($transport, $this->uri, $this->config->sasl, $this->config->timeout);
+        $transport  = $this->transport ?? new RevoltTransport(
+            readTimeout: $this->config->timeout,
+            tlsOptions:  $this->config->tlsOptions,
+        );
+        $this->activeTransport = $transport;
 
-        if ($this->config->autoReconnect) {
-            $reconnect = new AutoReconnect(
-                connect:    fn() => $connection->open(),
-                maxRetries: $this->config->maxRetries,
-                backoffMs:  $this->config->backoffMs,
-            );
-            $reconnect->run();
-        } else {
-            $connection->open();
-        }
+        $connection = new Connection($transport, $this->uri, $this->config->sasl, $this->config->timeout);
+        $connection->open();
 
         $this->connection = $connection;
         $this->session    = new Session($transport, channel: 0, timeout: $this->config->timeout);
@@ -50,12 +46,19 @@ class Client
         return $this;
     }
 
+    public function reconnect(): static
+    {
+        $this->close();
+        return $this->connect();
+    }
+
     public function close(): void
     {
         $this->session?->end();
         $this->connection?->close();
-        $this->connection = null;
-        $this->session    = null;
+        $this->connection    = null;
+        $this->session       = null;
+        $this->activeTransport = null;
     }
 
     public function isConnected(): bool
@@ -64,13 +67,6 @@ class Client
     }
 
     // --- Fluent config — do NOT mutate; return new instance ---
-
-    public function withAutoReconnect(int $maxRetries = 5, int $backoffMs = 1000): static
-    {
-        $clone         = clone $this;
-        $clone->config = $this->config->with(autoReconnect: true, maxRetries: $maxRetries, backoffMs: $backoffMs);
-        return $clone;
-    }
 
     public function withSasl(Sasl $sasl): static
     {
@@ -83,6 +79,14 @@ class Client
     {
         $clone         = clone $this;
         $clone->config = $this->config->with(timeout: $timeout);
+        return $clone;
+    }
+
+    /** @param array<string, mixed> $options */
+    public function withTlsOptions(array $options): static
+    {
+        $clone         = clone $this;
+        $clone->config = $this->config->with(tlsOptions: $options);
         return $clone;
     }
 

@@ -1,6 +1,5 @@
 <?php
 declare(strict_types=1);
-
 namespace AMQP10\Client;
 
 use AMQP10\Connection\Sasl;
@@ -8,26 +7,22 @@ use AMQP10\Connection\Sasl;
 readonly class Config
 {
     public function __construct(
-        public bool  $autoReconnect = false,
-        public int   $maxRetries    = 5,
-        public int   $backoffMs     = 1000,
-        public ?Sasl $sasl          = null,
-        public float $timeout       = 30.0,
+        public ?Sasl  $sasl       = null,
+        public float  $timeout    = 30.0,
+        /** @var array<string, mixed> */
+        public array  $tlsOptions = [],
     ) {}
 
+    /** @param array<string, mixed>|null $tlsOptions */
     public function with(
-        ?bool  $autoReconnect = null,
-        ?int   $maxRetries    = null,
-        ?int   $backoffMs     = null,
-        ?Sasl  $sasl          = null,
-        ?float $timeout       = null,
+        ?Sasl  $sasl       = null,
+        ?float $timeout    = null,
+        ?array $tlsOptions = null,
     ): self {
         return new self(
-            autoReconnect: $autoReconnect ?? $this->autoReconnect,
-            maxRetries:    $maxRetries    ?? $this->maxRetries,
-            backoffMs:     $backoffMs     ?? $this->backoffMs,
-            sasl:          $sasl          ?? $this->sasl,
-            timeout:       $timeout       ?? $this->timeout,
+            sasl:       $sasl       ?? $this->sasl,
+            timeout:    $timeout    ?? $this->timeout,
+            tlsOptions: $tlsOptions ?? $this->tlsOptions,
         );
     }
 }

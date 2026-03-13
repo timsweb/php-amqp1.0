@@ -118,7 +118,6 @@ class Session
                 );
             }
             if ($data === '') {
-                usleep(1000);
                 continue;
             }
             $this->frameParser->feed($data);

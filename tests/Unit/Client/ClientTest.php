@@ -16,24 +16,13 @@ class ClientTest extends TestCase
         $this->assertFalse($client->isConnected());
     }
 
-    public function test_with_auto_reconnect_returns_new_client_instance(): void
+    public function test_with_sasl_returns_new_instance(): void
     {
         $client  = new Client('amqp://guest:guest@localhost:5672/');
-        $client2 = $client->withAutoReconnect(maxRetries: 3, backoffMs: 500);
-        // Fluent methods must NOT mutate the original
+        $client2 = $client->withSasl(Sasl::plain('u', 'p'));
         $this->assertNotSame($client, $client2);
-    }
-
-    public function test_with_sasl_does_not_lose_auto_reconnect_config(): void
-    {
-        $client = new Client('amqp://guest:guest@localhost:5672/');
-        $client = $client->withAutoReconnect(maxRetries: 3, backoffMs: 500);
-        $client = $client->withSasl(Sasl::plain('u', 'p'));
-
-        // withSasl must not overwrite autoReconnect config
-        $config = $client->config();
-        $this->assertTrue($config->autoReconnect);
-        $this->assertSame(3, $config->maxRetries);
+        $this->assertNull($client->config()->sasl);
+        $this->assertNotNull($client2->config()->sasl);
     }
 
     public function test_config_timeout_default(): void
@@ -44,7 +33,7 @@ class ClientTest extends TestCase
 
     public function test_config_with_timeout(): void
     {
-        $config = new Config();
+        $config  = new Config();
         $updated = $config->with(timeout: 5.0);
         $this->assertSame(5.0, $updated->timeout);
         $this->assertSame(30.0, $config->timeout); // original unchanged
@@ -58,5 +47,15 @@ class ClientTest extends TestCase
         $this->assertNotSame($client, $client2);
         $this->assertSame(10.0, $client2->config()->timeout);
         $this->assertSame(30.0, $client->config()->timeout);
+    }
+
+    public function test_with_tls_options_returns_new_instance(): void
+    {
+        $client  = new Client('amqps://localhost/');
+        $client2 = $client->withTlsOptions(['verify_peer' => false]);
+
+        $this->assertNotSame($client, $client2);
+        $this->assertSame(['verify_peer' => false], $client2->config()->tlsOptions);
+        $this->assertSame([], $client->config()->tlsOptions);
     }
 }

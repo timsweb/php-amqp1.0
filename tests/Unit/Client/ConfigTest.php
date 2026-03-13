@@ -11,8 +11,24 @@ class ConfigTest extends TestCase
     public function test_config_defaults(): void
     {
         $config = new Config();
-        $this->assertFalse($config->autoReconnect);
-        $this->assertSame(5, $config->maxRetries);
-        $this->assertSame(1000, $config->backoffMs);
+        $this->assertNull($config->sasl);
+        $this->assertSame(30.0, $config->timeout);
+        $this->assertSame([], $config->tlsOptions);
+    }
+
+    public function test_config_with_timeout(): void
+    {
+        $config  = new Config();
+        $updated = $config->with(timeout: 5.0);
+        $this->assertSame(5.0, $updated->timeout);
+        $this->assertSame(30.0, $config->timeout); // original unchanged
+    }
+
+    public function test_config_with_tls_options(): void
+    {
+        $config  = new Config();
+        $updated = $config->with(tlsOptions: ['verify_peer' => false]);
+        $this->assertSame(['verify_peer' => false], $updated->tlsOptions);
+        $this->assertSame([], $config->tlsOptions); // original unchanged
     }
 }
