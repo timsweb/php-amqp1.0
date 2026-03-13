@@ -5,7 +5,7 @@ Modern PHP AMQP 1.0 client library for RabbitMQ 4.0+ with a fluent, type-safe AP
 ## Requirements
 
 - PHP 8.1 or higher
-- RabbitMQ 4.0+ with AMQP 1.0 plugin enabled
+- RabbitMQ 4.0+
 
 ## Installation
 
@@ -61,10 +61,10 @@ $client->connect();
 $message = new Message(
     body: 'Hello, world!',
     properties: [
-        'content-type' => 'text/plain',
+        'content-type'   => 'text/plain',
+        'correlation-id' => '12345',
     ],
     applicationProperties: [
-        'correlation-id' => '12345',
         'priority' => 'high',
     ],
     ttl: 60000, // 60 seconds
@@ -116,7 +116,7 @@ echo "Final message: " . $received . "\n";
 
 ```php
 $client->consume('my-queue')
-    ->prefetch(10) // Process up to 10 messages in parallel
+    ->prefetch(10) // Allow up to 10 unacknowledged messages in flight
     ->handle(function ($msg, $ctx) {
         // Process message
         processMessage($msg);
@@ -153,7 +153,6 @@ $mgmt->declareQueue($spec);
 // Delete a queue
 $mgmt->deleteQueue('my-queue');
 
-$mgmt->close();
 $client->close();
 ```
 
@@ -179,8 +178,6 @@ $mgmt->declareExchange($spec);
 
 // Delete an exchange
 $mgmt->deleteExchange('my-exchange');
-
-$mgmt->close();
 ```
 
 ### Bind Queues to Exchanges
@@ -196,8 +193,6 @@ $binding = new BindingSpecification(
     bindingKey: 'routing-key',
 );
 $mgmt->bind($binding);
-
-$mgmt->close();
 ```
 
 ## Advanced Configuration
@@ -222,24 +217,24 @@ use AMQP10\Client\Client;
 use AMQP10\Connection\Sasl;
 
 // PLAIN authentication (default)
-$sasl = Sasl::plain('username', 'password');
-$client = new Client('amqp://localhost:5672/', sasl: $sasl);
+$client = (new Client('amqp://localhost:5672/'))
+    ->withSasl(Sasl::plain('username', 'password'))
+    ->connect();
 
-// ANONYMOUS authentication
-$sasl = Sasl::anonymous();
-$client = new Client('amqp://localhost:5672/', sasl: $sasl);
-
-$client->connect();
+// EXTERNAL authentication
+$client = (new Client('amqp://localhost:5672/'))
+    ->withSasl(Sasl::external())
+    ->connect();
 ```
 
 ### Consumer Configuration
 
 ```php
 $client->consume('my-queue')
-    ->credit(10)               // Flow control credit (prefetch)
-    ->prefetch(10)             // Alias for credit()
-    ->offset(new Offset(100))  // Start from offset 100
-    ->filterSql('priority > 5') // Filter messages with SQL-92
+    ->credit(10)                  // Flow control credit (prefetch)
+    ->prefetch(10)                // Alias for credit()
+    ->offset(Offset::offset(100)) // Start from offset 100 (stream queues only)
+    ->filterSql('priority > 5')   // SQL filter (classic/quorum queues only)
     ->handle(function ($msg, $ctx) {
         // Handle message
         $ctx->accept();
