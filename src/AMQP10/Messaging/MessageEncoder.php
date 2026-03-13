@@ -49,20 +49,34 @@ class MessageEncoder
             $sections .= self::sectionMap(Descriptor::MSG_ANNOTATIONS, $pairs);
         }
 
-        // Properties section
+        // Properties section (spec §3.2.4)
         $props = $message->properties();
         if (!empty($props)) {
             $sections .= self::section(Descriptor::MSG_PROPERTIES, [
-                TypeEncoder::encodeNull(),  // message-id
-                TypeEncoder::encodeNull(),  // user-id
-                TypeEncoder::encodeNull(),  // to
-                TypeEncoder::encodeNull(),  // subject
-                TypeEncoder::encodeNull(),  // reply-to
-                TypeEncoder::encodeNull(),  // correlation-id
+                isset($props['message-id'])
+                    ? TypeEncoder::encodeString($props['message-id'])
+                    : TypeEncoder::encodeNull(),
+                isset($props['user-id'])
+                    ? TypeEncoder::encodeBinary($props['user-id'])
+                    : TypeEncoder::encodeNull(),
+                isset($props['to'])
+                    ? TypeEncoder::encodeString($props['to'])
+                    : TypeEncoder::encodeNull(),
+                isset($props['subject'])
+                    ? TypeEncoder::encodeString($props['subject'])
+                    : TypeEncoder::encodeNull(),
+                isset($props['reply-to'])
+                    ? TypeEncoder::encodeString($props['reply-to'])
+                    : TypeEncoder::encodeNull(),
+                isset($props['correlation-id'])
+                    ? TypeEncoder::encodeString($props['correlation-id'])
+                    : TypeEncoder::encodeNull(),
                 isset($props['content-type'])
                     ? TypeEncoder::encodeSymbol($props['content-type'])
                     : TypeEncoder::encodeNull(),
-                TypeEncoder::encodeNull(),  // content-encoding
+                isset($props['content-encoding'])
+                    ? TypeEncoder::encodeSymbol($props['content-encoding'])
+                    : TypeEncoder::encodeNull(),
             ]);
         }
 

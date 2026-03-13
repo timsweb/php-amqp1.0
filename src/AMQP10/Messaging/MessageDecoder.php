@@ -40,10 +40,20 @@ class MessageDecoder
     {
         $map = [];
         // Properties list fields (spec §3.2.4):
-        // [0]=message-id [1]=user-id [2]=to [3]=subject [4]=reply-to [5]=correlation-id
-        // [6]=content-type [7]=content-encoding
-        if (isset($fields[6]) && $fields[6] !== null) {
-            $map['content-type'] = $fields[6];
+        $names = [
+            0 => 'message-id',
+            1 => 'user-id',
+            2 => 'to',
+            3 => 'subject',
+            4 => 'reply-to',
+            5 => 'correlation-id',
+            6 => 'content-type',
+            7 => 'content-encoding',
+        ];
+        foreach ($names as $index => $name) {
+            if (isset($fields[$index]) && $fields[$index] !== null) {
+                $map[$name] = $fields[$index];
+            }
         }
         return $map;
     }
