@@ -65,6 +65,9 @@ class PerformativeEncoder
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::END, []));
     }
 
+    /**
+     * @param array<mixed, mixed>|null $properties
+     */
     public static function attach(
         int     $channel,
         string  $name,
@@ -186,6 +189,9 @@ class PerformativeEncoder
         return self::described(Descriptor::RELEASED, []);
     }
 
+    /**
+     * @param array<int, string> $mechanisms
+     */
     public static function saslMechanisms(array $mechanisms): string
     {
         $fields = [TypeEncoder::encodeSymbolArray($mechanisms)];
@@ -208,6 +214,9 @@ class PerformativeEncoder
         return FrameBuilder::sasl(body: self::described(Descriptor::SASL_OUTCOME, $fields));
     }
 
+    /**
+     * @param array<int, string> $fields
+     */
     private static function described(int $descriptor, array $fields): string
     {
         return TypeEncoder::encodeDescribed(

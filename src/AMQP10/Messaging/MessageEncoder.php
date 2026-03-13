@@ -99,6 +99,9 @@ class MessageEncoder
         return $sections;
     }
 
+    /**
+     * @param array<int, string> $fields
+     */
     private static function section(int $descriptor, array $fields): string
     {
         return TypeEncoder::encodeDescribed(
@@ -107,6 +110,9 @@ class MessageEncoder
         );
     }
 
+    /**
+     * @param array<string, string> $pairs
+     */
     private static function sectionMap(int $descriptor, array $pairs): string
     {
         return TypeEncoder::encodeDescribed(

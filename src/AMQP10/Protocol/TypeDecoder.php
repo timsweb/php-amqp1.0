@@ -76,6 +76,7 @@ class TypeDecoder
         return $this->offset;
     }
 
+    /** @return array<int, mixed> */
     private function decodeList8(): array
     {
         $size  = $this->readByte();
@@ -83,6 +84,7 @@ class TypeDecoder
         return $this->decodeItems($count);
     }
 
+    /** @return array<int, mixed> */
     private function decodeList32(): array
     {
         $size  = $this->readUint32();
@@ -90,6 +92,7 @@ class TypeDecoder
         return $this->decodeItems($count);
     }
 
+    /** @return array<int, mixed> */
     private function decodeItems(int $count): array
     {
         $items = [];
@@ -99,6 +102,7 @@ class TypeDecoder
         return $items;
     }
 
+    /** @return array<mixed, mixed> */
     private function decodeMap8(): array
     {
         $size  = $this->readByte();
@@ -106,6 +110,7 @@ class TypeDecoder
         return $this->decodeMapItems($count);
     }
 
+    /** @return array<mixed, mixed> */
     private function decodeMap32(): array
     {
         $size  = $this->readUint32();
@@ -113,6 +118,7 @@ class TypeDecoder
         return $this->decodeMapItems($count);
     }
 
+    /** @return array<mixed, mixed> */
     private function decodeMapItems(int $count): array
     {
         if ($count % 2 !== 0) {
@@ -127,6 +133,7 @@ class TypeDecoder
         return $map;
     }
 
+    /** @return array<int, mixed> */
     private function decodeArray8(): array
     {
         $size        = $this->readByte();
@@ -135,6 +142,7 @@ class TypeDecoder
         return $this->decodeArrayElements($count, $constructor);
     }
 
+    /** @return array<int, mixed> */
     private function decodeArray32(): array
     {
         $size        = $this->readUint32();
@@ -143,6 +151,7 @@ class TypeDecoder
         return $this->decodeArrayElements($count, $constructor);
     }
 
+    /** @return array<int, mixed> */
     private function decodeArrayElements(int $count, int $constructor): array
     {
         $items = [];
@@ -155,6 +164,7 @@ class TypeDecoder
         return $items;
     }
 
+    /** @return array<string, mixed> */
     private function decodeDescribed(): array
     {
         $descriptor = $this->decode();

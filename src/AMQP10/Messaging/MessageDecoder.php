@@ -36,6 +36,10 @@ class MessageDecoder
         return new Message($body, properties: $props, applicationProperties: $appProps, annotations: $annotations);
     }
 
+    /**
+     * @param array<int, mixed> $fields
+     * @return array<string, mixed>
+     */
     private static function extractProperties(array $fields): array
     {
         $map = [];

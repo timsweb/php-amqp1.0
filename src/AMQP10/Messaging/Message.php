@@ -5,6 +5,11 @@ namespace AMQP10\Messaging;
 
 class Message
 {
+    /**
+     * @param array<string, mixed> $properties
+     * @param array<string, mixed> $applicationProperties
+     * @param array<string, mixed> $annotations
+     */
     public function __construct(
         private readonly string $body,
         private readonly array  $properties            = [],
@@ -44,16 +49,19 @@ class Message
         return $this->priority;
     }
 
+    /** @return array<string, mixed> */
     public function properties(): array
     {
         return $this->properties;
     }
 
+    /** @return array<string, mixed> */
     public function applicationProperties(): array
     {
         return $this->applicationProperties;
     }
 
+    /** @return array<string, mixed> */
     public function annotations(): array
     {
         return $this->annotations;

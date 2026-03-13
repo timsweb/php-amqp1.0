@@ -127,6 +127,7 @@ class Management
         $this->sender->detach();
     }
 
+    /** @return array<string, mixed> */
     private function request(string $method, string $path, ?string $amqpBody): array
     {
         $requestId = (string) ++$this->requestId;
@@ -164,6 +165,7 @@ class Management
         return $propertiesSection . $amqpValueSection;
     }
 
+    /** @return array<string, mixed> */
     private function awaitResponse(string $requestId): array
     {
         $deadline = microtime(true) + $this->timeout;
@@ -210,6 +212,7 @@ class Management
         }
     }
 
+    /** @return array<string, mixed> */
     private function decodeResponsePayload(string $payload): array
     {
         $decoder = new TypeDecoder($payload);
@@ -246,6 +249,10 @@ class Management
         return $result;
     }
 
+    /**
+     * @param array<string, mixed> $response
+     * @param array<int> $expected
+     */
     private function assertSuccess(array $response, array $expected, string $path = ''): void
     {
         if (in_array($response['status'], $expected, true)) {

@@ -17,8 +17,8 @@ class Consumer
 
     public function __construct(
         private readonly Session  $session,
-        private readonly string   $address,
-        private readonly int      $credit       = 10,
+        string                   $address,
+        int                      $credit       = 10,
         private readonly ?Offset  $offset       = null,
         private readonly ?string  $filterSql    = null,
         private readonly float    $idleTimeout  = 30.0,

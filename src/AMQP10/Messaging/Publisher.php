@@ -16,7 +16,7 @@ class Publisher
 
     public function __construct(
         private readonly Session $session,
-        private readonly string  $address,
+        string                  $address,
         private readonly float   $timeout = 30.0,
     ) {
         $linkName   = 'sender-' . bin2hex(random_bytes(4));
