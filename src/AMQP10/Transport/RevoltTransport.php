@@ -10,6 +10,9 @@ class RevoltTransport implements TransportInterface
     /** @var resource|null */
     private mixed $stream = null;
 
+    /**
+     * @param array<string, mixed> $tlsOptions
+     */
     public function __construct(
         private readonly float $readTimeout = 30.0,
         private readonly array $tlsOptions  = [],
@@ -47,12 +50,81 @@ class RevoltTransport implements TransportInterface
 
     public function send(string $bytes): void
     {
-        throw new \LogicException('Not yet implemented');
+        if ($this->stream === null) {
+            throw new ConnectionFailedException('Not connected');
+        }
+        $total  = strlen($bytes);
+        $offset = 0;
+        while ($offset < $total) {
+            $written = @fwrite($this->stream, substr($bytes, $offset));
+            if ($written === false) {
+                throw new ConnectionFailedException('Failed to write to socket');
+            }
+            if ($written === 0) {
+                $suspension = EventLoop::getSuspension();
+                $resolved   = false;
+                $id = EventLoop::onWritable($this->stream, function () use ($suspension, &$resolved) {
+                    if (!$resolved) {
+                        $resolved = true;
+                        $suspension->resume();
+                    }
+                });
+                $suspension->suspend();
+                EventLoop::cancel($id);
+            } else {
+                $offset += $written;
+            }
+        }
     }
 
     public function read(int $length = 4096): ?string
     {
-        throw new \LogicException('Not yet implemented');
+        if ($this->stream === null) {
+            throw new ConnectionFailedException('Not connected');
+        }
+
+        $data = @fread($this->stream, $length);
+
+        if ($data === false) {
+            return null;
+        }
+        if ($data !== '') {
+            return $data;
+        }
+        if (feof($this->stream)) {
+            return null;
+        }
+
+        // No data yet — suspend until readable or timeout fires
+        $suspension = EventLoop::getSuspension();
+        $resolved   = false;
+
+        $readId = EventLoop::onReadable($this->stream, function () use ($suspension, &$resolved) {
+            if (!$resolved) {
+                $resolved = true;
+                $suspension->resume(true);
+            }
+        });
+        $timeoutId = EventLoop::delay($this->readTimeout, function () use ($suspension, &$resolved) {
+            if (!$resolved) {
+                $resolved = true;
+                $suspension->resume(false);
+            }
+        });
+
+        $hasData = $suspension->suspend();
+        EventLoop::cancel($readId);
+        EventLoop::cancel($timeoutId);
+
+        if (!$hasData) {
+            return '';
+        }
+
+        $data = @fread($this->stream, $length);
+        if ($data === false || ($data === '' && feof($this->stream))) {
+            return null;
+        }
+        return $data;
     }
 
     public function isConnected(): bool

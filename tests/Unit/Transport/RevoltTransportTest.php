@@ -34,4 +34,85 @@ class RevoltTransportTest extends TestCase
         $t->disconnect(); // must not throw
         $this->assertFalse($t->isConnected());
     }
+
+    public function test_send_and_read_over_socket_pair(): void
+    {
+        [$a, $b] = $this->socketPair();
+        stream_set_blocking($b, true);
+
+        $t = new RevoltTransport();
+        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref->setAccessible(true);
+        $ref->setValue($t, $a);
+        stream_set_blocking($a, false);
+
+        \Revolt\EventLoop::run(function () use ($t, $b) {
+            $t->send('hello');
+            $received = fread($b, 4096);
+            $this->assertSame('hello', $received);
+            \Revolt\EventLoop::stop();
+        });
+
+        fclose($b);
+    }
+
+    public function test_read_returns_data_when_available(): void
+    {
+        [$a, $b] = $this->socketPair();
+        stream_set_blocking($b, true);
+
+        $t = new RevoltTransport(readTimeout: 1.0);
+        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref->setAccessible(true);
+        $ref->setValue($t, $a);
+        stream_set_blocking($a, false);
+
+        \Revolt\EventLoop::run(function () use ($t, $b) {
+            fwrite($b, 'world');
+            $data = $t->read(4096);
+            $this->assertSame('world', $data);
+            \Revolt\EventLoop::stop();
+        });
+
+        fclose($b);
+    }
+
+    public function test_read_returns_empty_string_on_timeout(): void
+    {
+        [$a, $b] = $this->socketPair();
+
+        $t = new RevoltTransport(readTimeout: 0.05);
+        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref->setAccessible(true);
+        $ref->setValue($t, $a);
+        stream_set_blocking($a, false);
+
+        \Revolt\EventLoop::run(function () use ($t, $b) {
+            $data = $t->read(4096);
+            $this->assertSame('', $data);
+            \Revolt\EventLoop::stop();
+        });
+
+        fclose($b);
+    }
+
+    public function test_read_returns_null_on_closed_connection(): void
+    {
+        [$a, $b] = $this->socketPair();
+
+        $t = new RevoltTransport(readTimeout: 1.0);
+        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref->setAccessible(true);
+        $ref->setValue($t, $a);
+        stream_set_blocking($a, false);
+
+        \Revolt\EventLoop::run(function () use ($t, $b) {
+            fclose($b);
+            \Revolt\EventLoop::delay(0.02, function () use ($t) {
+                $data = $t->read(4096);
+                $this->assertNull($data);
+                \Revolt\EventLoop::stop();
+            });
+        });
+    }
 }
