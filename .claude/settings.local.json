@@ -33,7 +33,15 @@
       "Bash(gh api:*)",
       "Bash(gh search:*)",
       "Bash(gh auth:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(php vendor/bin/phpunit tests/Unit/ 2>&1 | tail -40)",
+      "Bash(php vendor/bin/phpunit tests/Unit/ 2>&1 | tail -15)",
+      "Bash(php vendor/bin/phpunit tests/Integration/StreamFilterIntegrationTest.php --testdox 2>&1)",
+      "Bash(php vendor/bin/phpunit tests/Unit/ 2>&1 | tail -10)",
+      "Bash(php vendor/bin/phpunit tests/Integration/StreamFilterIntegrationTest.php --filter=\"filterBloom|classic_queue|offset\" --testdox 2>&1)",
+      "Bash(docker exec b50f6b14def1 erl -noshell -eval ':*)",
+      "Bash(docker cp:*)",
+      "Read(//tmp/**)"
     ]
   }
 }

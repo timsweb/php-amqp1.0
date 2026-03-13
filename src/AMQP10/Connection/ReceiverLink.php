@@ -44,7 +44,7 @@ class ReceiverLink
             properties: $properties,
             filterMap:  $this->filterMap,
         ));
-        $this->session->readFrameOfType(Descriptor::ATTACH);
+        $this->session->readFrameOfType(Descriptor::ATTACH, $this->handle);
         $this->attached = true;
         $this->grantCredit($this->initialCredit);
     }

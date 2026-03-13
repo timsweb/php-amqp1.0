@@ -309,7 +309,7 @@ class ConsumerTest extends TestCase
         $key = array_key_first($map);
         $value = $map[$key];
 
-        // Described type: descriptor + string value (RabbitMQ AMQP SQL)
+        // Described type: map key is 'sql-filter', but internal descriptor is 'amqp:sql-filter'
         $this->assertSame('amqp:sql-filter', $value['descriptor']);
         $this->assertSame("color = 'red'", $value['value']);
     }
@@ -342,7 +342,7 @@ class ConsumerTest extends TestCase
 
         $keys = array_keys($map);
         $this->assertContains('rabbitmq:stream-offset-spec', $keys);
-        $this->assertContains('amqp:sql-filter', $keys);
+        $this->assertContains('sql-filter', $keys);
     }
 
     public function test_buildFilterMap_returns_null_when_no_filters(): void
@@ -511,7 +511,7 @@ class ConsumerTest extends TestCase
         $key = array_key_first($map);
         $value = $map[$key];
 
-        // Described type: descriptor + string value
+        // Map key is 'sql-filter'; internal described type descriptor is 'amqp:sql-filter'
         $this->assertIsArray($value);
         $this->assertSame('amqp:sql-filter', $value['descriptor']);
         $this->assertSame('priority > 5', $value['value']);
@@ -540,9 +540,11 @@ class ConsumerTest extends TestCase
         $key = array_key_first($map);
         $value = $map[$key];
 
-        // Single value: raw string
+        // Single value: described type (per AMQP spec §3.5.4 filter-set values must be described types)
         $this->assertSame('rabbitmq:stream-filter', $key);
-        $this->assertSame('invoices', $value);
+        $this->assertIsArray($value);
+        $this->assertSame('rabbitmq:stream-filter', $value['descriptor']);
+        $this->assertSame('invoices', $value['value']);
     }
 
     public function test_buildFilterMap_with_filterBloom_multiple(): void
@@ -568,12 +570,14 @@ class ConsumerTest extends TestCase
         $key = array_key_first($map);
         $value = $map[$key];
 
-        // Multiple values: symbol array
+        // Multiple values: described type wrapping a symbol array (per AMQP spec §3.5.4)
         $this->assertSame('rabbitmq:stream-filter', $key);
         $this->assertIsArray($value);
-        $this->assertContains('california', $value);
-        $this->assertContains('texas', $value);
-        $this->assertContains('newyork', $value);
+        $this->assertSame('rabbitmq:stream-filter', $value['descriptor']);
+        $this->assertIsArray($value['value']);
+        $this->assertContains('california', $value['value']);
+        $this->assertContains('texas', $value['value']);
+        $this->assertContains('newyork', $value['value']);
     }
 
     public function test_buildFilterMap_with_matchUnfiltered(): void
@@ -597,7 +601,10 @@ class ConsumerTest extends TestCase
         $this->assertCount(1, $map);
 
         $this->assertArrayHasKey('rabbitmq:stream-match-unfiltered', $map);
-        $this->assertTrue($map['rabbitmq:stream-match-unfiltered']);
+        $unfiltered = $map['rabbitmq:stream-match-unfiltered'];
+        $this->assertIsArray($unfiltered);
+        $this->assertSame('rabbitmq:stream-match-unfiltered', $unfiltered['descriptor']);
+        $this->assertTrue($unfiltered['value']);
     }
 
     public function test_buildFilterMap_with_multiple_filters(): void
@@ -629,7 +636,7 @@ class ConsumerTest extends TestCase
         $this->assertCount(4, $map);
 
         $this->assertArrayHasKey('rabbitmq:stream-offset-spec', $map);
-        $this->assertArrayHasKey('amqp:sql-filter', $map);
+        $this->assertArrayHasKey('sql-filter', $map);
         $this->assertArrayHasKey('rabbitmq:stream-filter', $map);
         $this->assertArrayHasKey('rabbitmq:stream-match-unfiltered', $map);
     }

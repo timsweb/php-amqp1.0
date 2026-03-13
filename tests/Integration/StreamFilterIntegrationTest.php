@@ -127,10 +127,10 @@ class StreamFilterIntegrationTest extends IntegrationTestCase
 
         $address = AddressHelper::queueAddress($queueName);
 
-        // Publish messages with different application properties (for AMQP SQL filtering)
+        // Publish messages with different standard properties (for AMQP SQL filtering on properties.subject)
         for ($i = 1; $i <= 10; $i++) {
             $subject = ($i <= 3) ? 'priority-high' : 'priority-low';
-            $msg = new Message("msg-{$i}", applicationProperties: ['subject' => $subject]);
+            $msg = new Message("msg-{$i}", properties: ['subject' => $subject]);
             $this->client->publish($address)->send($msg);
         }
 
@@ -143,6 +143,7 @@ class StreamFilterIntegrationTest extends IntegrationTestCase
         // Filter for high priority messages only using RabbitMQ AMQP SQL
         $this->client->consume($address)
             ->credit(10)
+            ->offset(Offset::first())
             ->filterAmqpSql("properties.subject = 'priority-high'")
             ->handle(function(\AMQP10\Messaging\Message $msg, \AMQP10\Messaging\DeliveryContext $ctx)
                 use (&$received, &$count, $client) {
@@ -201,6 +202,7 @@ class StreamFilterIntegrationTest extends IntegrationTestCase
         // Filter for 'invoices' only using RabbitMQ Bloom filter
         $this->client->consume($address)
             ->credit(10)
+            ->offset(Offset::first())
             ->filterBloom(['invoices'])
             ->handle(function(\AMQP10\Messaging\Message $msg, \AMQP10\Messaging\DeliveryContext $ctx)
                 use (&$received, &$count, $client) {
@@ -261,7 +263,7 @@ class StreamFilterIntegrationTest extends IntegrationTestCase
             $msg = new Message(
                 "msg-{$i}",
                 annotations: ['x-stream-filter-value' => $filterValue],
-                applicationProperties: ['subject' => $subject]
+                properties: ['subject' => $subject]
             );
             $this->client->publish($address)->send($msg);
         }

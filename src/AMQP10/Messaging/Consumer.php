@@ -67,23 +67,28 @@ class Consumer
         }
 
         if ($this->filterAmqpSql !== null) {
-            $sqlString = TypeEncoder::encodeString($this->filterAmqpSql);
-            $pairs[TypeEncoder::encodeSymbol('amqp:sql-filter')] = $sqlString;
+            $mapKey     = TypeEncoder::encodeSymbol('sql-filter');
+            $descriptor = TypeEncoder::encodeSymbol('amqp:sql-filter');
+            $sqlString  = TypeEncoder::encodeString($this->filterAmqpSql);
+            $pairs[$mapKey] = TypeEncoder::encodeDescribed($descriptor, $sqlString);
         }
 
         if ($this->filterBloomValues !== null) {
             $descriptor = TypeEncoder::encodeSymbol('rabbitmq:stream-filter');
             if (count($this->filterBloomValues) === 1) {
-                $value = TypeEncoder::encodeString($this->filterBloomValues[0]);
+                $inner = TypeEncoder::encodeString($this->filterBloomValues[0]);
             } else {
-                $value = TypeEncoder::encodeSymbolArray($this->filterBloomValues);
+                $inner = TypeEncoder::encodeList(array_map(
+                    fn(string $v) => TypeEncoder::encodeString($v),
+                    $this->filterBloomValues
+                ));
             }
-            $pairs[$descriptor] = $value;
+            $pairs[$descriptor] = TypeEncoder::encodeDescribed($descriptor, $inner);
         }
 
         if ($this->matchUnfiltered) {
-            $pairs[TypeEncoder::encodeSymbol('rabbitmq:stream-match-unfiltered')] =
-                TypeEncoder::encodeBool(true);
+            $descriptor = TypeEncoder::encodeSymbol('rabbitmq:stream-match-unfiltered');
+            $pairs[$descriptor] = TypeEncoder::encodeDescribed($descriptor, TypeEncoder::encodeBool(true));
         }
 
         return TypeEncoder::encodeMap($pairs);

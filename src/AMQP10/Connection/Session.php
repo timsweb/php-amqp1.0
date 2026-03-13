@@ -77,7 +77,13 @@ class Session
         return $this->transport;
     }
 
-    public function readFrameOfType(int $descriptor): string
+    /**
+     * @param int      $descriptor           The performative descriptor to wait for.
+     * @param int|null $rejectOnDetachHandle  If set, throw immediately if a DETACH arrives for this link handle.
+     *                                        Used by SenderLink/ReceiverLink to detect link rejection without
+     *                                        confusing it with stale DETACH responses from previously closed links.
+     */
+    public function readFrameOfType(int $descriptor, ?int $rejectOnDetachHandle = null): string
     {
         $deadline = microtime(true) + $this->timeout;
         while (true) {
@@ -86,6 +92,16 @@ class Session
                     unset($this->pendingFrames[$i]);
                     $this->pendingFrames = array_values($this->pendingFrames);
                     return $frame['raw'];
+                }
+                if ($rejectOnDetachHandle !== null
+                    && $frame['descriptor'] === Descriptor::DETACH
+                    && $this->extractDetachHandle($frame['raw']) === $rejectOnDetachHandle
+                ) {
+                    unset($this->pendingFrames[$i]);
+                    $this->pendingFrames = array_values($this->pendingFrames);
+                    throw new \RuntimeException(
+                        'AMQP link rejected by server (handle ' . $rejectOnDetachHandle . ')'
+                    );
                 }
             }
 
@@ -116,6 +132,22 @@ class Session
                 }
                 $this->pendingFrames[] = ['raw' => $frame, 'descriptor' => $frameDescriptor];
             }
+        }
+    }
+
+    /**
+     * Extract the link handle from a DETACH frame body.
+     * Returns null if the frame cannot be parsed.
+     */
+    private function extractDetachHandle(string $frame): ?int
+    {
+        try {
+            $body = FrameParser::extractBody($frame);
+            $performative = (new TypeDecoder($body))->decode();
+            $handle = $performative['value'][0] ?? null;
+            return is_int($handle) ? $handle : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 

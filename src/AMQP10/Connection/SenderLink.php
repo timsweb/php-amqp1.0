@@ -46,7 +46,7 @@ class SenderLink
             properties:           $properties,
             initialDeliveryCount: $initialDeliveryCount,
         ));
-        $this->session->readFrameOfType(Descriptor::ATTACH);
+        $this->session->readFrameOfType(Descriptor::ATTACH, $this->handle);
         $this->attached = true;
     }
 
