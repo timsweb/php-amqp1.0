@@ -4,7 +4,7 @@ Modern PHP AMQP 1.0 client library for RabbitMQ 4.0+ with a fluent, type-safe AP
 
 ## Requirements
 
-- PHP 8.1 or higher
+- PHP 8.2 or higher
 - RabbitMQ 4.0+
 
 ## Installation
