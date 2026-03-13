@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace AMQP10\Tests\Protocol;
 
+use AMQP10\Exception\FrameException;
 use AMQP10\Protocol\FrameBuilder;
 use AMQP10\Protocol\FrameParser;
 use PHPUnit\Framework\TestCase;
@@ -107,5 +108,35 @@ class FrameParserTest extends TestCase
         $frames = $parser->readyFrames();
         $this->assertSame(0x00, FrameParser::extractType($frames[0]));
         $this->assertSame(0x01, FrameParser::extractType($frames[1]));
+    }
+
+    public function test_rejects_frame_size_below_minimum(): void
+    {
+        $parser = new FrameParser();
+        // Frame claiming size 4 (below minimum 8)
+        $this->expectException(FrameException::class);
+        $this->expectExceptionMessage('below minimum');
+        $parser->feed(pack('N', 4) . "\x00\x00\x00\x00");
+    }
+
+    public function test_rejects_oversized_frame(): void
+    {
+        $parser = new FrameParser();
+        // Frame claiming size larger than max
+        $size = FrameParser::MAX_FRAME_SIZE + 1;
+        $this->expectException(FrameException::class);
+        $this->expectExceptionMessage('exceeds maximum');
+        $parser->feed(pack('N', $size) . str_repeat("\x00", 100));
+    }
+
+    public function test_accepts_frame_at_max_size(): void
+    {
+        // Build a valid frame with body exactly at max minus header
+        $body  = str_repeat("\x40", FrameParser::MAX_FRAME_SIZE - 8);
+        $frame = FrameBuilder::amqp(channel: 0, body: $body);
+        $parser = new FrameParser();
+        $parser->feed($frame);
+        $frames = $parser->readyFrames();
+        $this->assertCount(1, $frames);
     }
 }

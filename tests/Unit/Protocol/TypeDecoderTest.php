@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace AMQP10\Tests\Protocol;
 
+use AMQP10\Exception\FrameException;
 use AMQP10\Protocol\TypeDecoder;
 use AMQP10\Protocol\TypeEncoder;
 use PHPUnit\Framework\TestCase;
@@ -111,5 +112,29 @@ class TypeDecoderTest extends TestCase
         $decoder = new TypeDecoder($data);
         $decoder->decode(); // consume null
         $this->assertGreaterThan(0, $decoder->remaining());
+    }
+
+    public function test_rejects_oversized_var32(): void
+    {
+        // str32 with length > 1MB: type(1) + len(4) = 5 bytes header
+        $len = 1_048_577; // MAX_VAR_SIZE + 1
+        $data = pack('CN', 0xB1, $len); // STR32 constructor + oversized length
+        $decoder = new TypeDecoder($data);
+
+        $this->expectException(FrameException::class);
+        $this->expectExceptionMessage('exceeds maximum');
+        $decoder->decode();
+    }
+
+    public function test_rejects_odd_map_count(): void
+    {
+        // map8: constructor(1) + size(1) + count(1) + items
+        // Manually craft a map8 with odd count = 3
+        $data = pack('CCC', 0xC1, 4, 3) . "\x40\x40\x40"; // 3 nulls
+        $decoder = new TypeDecoder($data);
+
+        $this->expectException(FrameException::class);
+        $this->expectExceptionMessage('even');
+        $decoder->decode();
     }
 }

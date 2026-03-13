@@ -6,6 +6,8 @@ use AMQP10\Exception\FrameException;
 
 class TypeDecoder
 {
+    private const MAX_VAR_SIZE = 1_048_576; // 1 MB
+
     private int $offset = 0;
 
     public function __construct(private readonly string $buffer) {}
@@ -113,6 +115,9 @@ class TypeDecoder
 
     private function decodeMapItems(int $count): array
     {
+        if ($count % 2 !== 0) {
+            throw new FrameException("Map item count must be even, got {$count}");
+        }
         $map = [];
         for ($i = 0; $i < $count; $i += 2) {
             $key       = $this->decode();
@@ -238,6 +243,9 @@ class TypeDecoder
     private function readVar32(): string
     {
         $len = $this->readUint32();
+        if ($len > self::MAX_VAR_SIZE) {
+            throw new FrameException("Variable-length field size {$len} exceeds maximum (" . self::MAX_VAR_SIZE . " bytes)");
+        }
         if ($len > $this->remaining()) {
             throw new FrameException("Buffer too short: need {$len} bytes, have {$this->remaining()}");
         }
