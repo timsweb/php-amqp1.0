@@ -20,7 +20,10 @@ class Management
     private readonly string       $replyTo;
     private int     $requestId    = 0;
 
-    public function __construct(private readonly Session $session)
+    public function __construct(
+        private readonly Session $session,
+        private readonly float   $timeout = 30.0,
+    )
     {
         $this->replyTo  = 'management-reply-' . bin2hex(random_bytes(8));
 
@@ -163,10 +166,20 @@ class Management
 
     private function awaitResponse(string $requestId): array
     {
+        $deadline = microtime(true) + $this->timeout;
         while (true) {
+            if (microtime(true) >= $deadline) {
+                throw new ManagementException(
+                    "Timeout after {$this->timeout}s awaiting management response"
+                );
+            }
             $frame = $this->session->nextFrame();
             if ($frame === null) {
-                throw new ManagementException('Connection closed awaiting management response');
+                if (!$this->session->transport()->isConnected()) {
+                    throw new ManagementException('Connection closed awaiting management response');
+                }
+                usleep(1000);
+                continue;
             }
 
             $body         = FrameParser::extractBody($frame);

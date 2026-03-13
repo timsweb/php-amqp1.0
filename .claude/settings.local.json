@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/tim/Documents/projects/php-amqp10/src -type f | grep -v \"\\\\.php$\" | sort)",
+      "Bash(grep -h \"^class\\\\|^abstract class\" /Users/tim/Documents/projects/php-amqp10/src/AMQP10/Exception/*.php | sort | uniq)",
+      "Bash(wc -l /Users/tim/Documents/projects/php-amqp10/src/AMQP10/Exception/*.php | sort -n)",
+      "Bash(php -l src/AMQP10/Exception/AmqpException.php 2>&1)",
+      "Bash(php -r \"include 'vendor/autoload.php'; \\\\$e = new class extends \\\\AMQP10\\\\Exception\\\\AmqpException {}; echo 'OK';\" 2>&1)",
+      "Bash(composer dump-autoload:*)",
+      "Bash(./vendor/bin/phpunit 2>&1)",
+      "WebFetch(domain:www.rabbitmq.com)",
+      "WebFetch(domain:docs.oasis-open.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:rabbitmq.github.io)",
+      "Bash(git add:*)",
+      "Bash(./vendor/bin/phpunit tests/Unit/Protocol/TypeEncoderTest.php 2>&1 | tail -5)",
+      "Bash(./vendor/bin/phpunit tests/Unit/Protocol/TypeEncoderTest.php 2>&1)",
+      "Bash(./vendor/bin/phpunit tests/Unit/Protocol/TypeDecoderTest.php 2>&1 | tail -5)",
+      "Bash(./vendor/bin/phpunit tests/Unit/Protocol/FrameBuilderTest.php 2>&1 | tail -5)",
+      "Bash(./vendor/bin/phpunit *)",
+      "Bash(git add*)",
+      "Bash(git add)",
+      "Bash(git add :*)",
+      "Bash(find src:*)",
+      "Bash(docker pull:*)",
+      "Bash(docker run:*)",
+      "Bash(docker exec:*)",
+      "Bash(timeout 60 /Users/tim/Documents/projects/php-amqp10/vendor/bin/phpunit 2>&1)",
+      "Bash(timeout 20 php /tmp/test_management2.php 2>&1)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(docker ps:*)",
+      "Bash(gh api:*)",
+      "Bash(gh search:*)",
+      "Bash(gh auth:*)",
+      "Bash(git checkout:*)"
+    ]
+  }
+}

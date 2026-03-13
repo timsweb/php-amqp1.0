@@ -4,6 +4,7 @@ namespace AMQP10\Messaging;
 
 use AMQP10\Connection\SenderLink;
 use AMQP10\Connection\Session;
+use AMQP10\Exception\MessageTimeoutException;
 use AMQP10\Exception\PublishException;
 use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\FrameParser;
@@ -16,6 +17,7 @@ class Publisher
     public function __construct(
         private readonly Session $session,
         private readonly string  $address,
+        private readonly float   $timeout = 30.0,
     ) {
         $linkName   = 'sender-' . bin2hex(random_bytes(4));
         $this->link = new SenderLink($session, name: $linkName, target: $address);
@@ -39,10 +41,20 @@ class Publisher
 
     private function awaitOutcome(int $deliveryId): Outcome
     {
+        $deadline = microtime(true) + $this->timeout;
         while (true) {
+            if (microtime(true) >= $deadline) {
+                throw new MessageTimeoutException(
+                    "Timeout after {$this->timeout}s awaiting disposition for delivery $deliveryId"
+                );
+            }
             $frame = $this->session->nextFrame();
             if ($frame === null) {
-                throw new PublishException('Connection closed while awaiting outcome');
+                if (!$this->session->transport()->isConnected()) {
+                    throw new PublishException('Connection closed while awaiting outcome');
+                }
+                usleep(1000);
+                continue;
             }
 
             $body         = FrameParser::extractBody($frame);

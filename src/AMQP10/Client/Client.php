@@ -29,8 +29,8 @@ class Client
      */
     public function connect(): static
     {
-        $transport  = $this->transport ?? new BlockingAdapter();
-        $connection = new Connection($transport, $this->uri, $this->config->sasl);
+        $transport  = $this->transport ?? new BlockingAdapter(timeout: $this->config->timeout);
+        $connection = new Connection($transport, $this->uri, $this->config->sasl, $this->config->timeout);
 
         if ($this->config->autoReconnect) {
             $reconnect = new AutoReconnect(
@@ -44,7 +44,7 @@ class Client
         }
 
         $this->connection = $connection;
-        $this->session    = new Session($transport, channel: 0);
+        $this->session    = new Session($transport, channel: 0, timeout: $this->config->timeout);
         $this->session->begin();
 
         return $this;
@@ -79,6 +79,13 @@ class Client
         return $clone;
     }
 
+    public function withTimeout(float $timeout): static
+    {
+        $clone         = clone $this;
+        $clone->config = $this->config->with(timeout: $timeout);
+        return $clone;
+    }
+
     public function config(): Config
     {
         return $this->config;
@@ -88,17 +95,17 @@ class Client
 
     public function publish(string $address): PublisherBuilder
     {
-        return new PublisherBuilder($this->session(), $address);
+        return new PublisherBuilder($this->session(), $address, $this->config->timeout);
     }
 
     public function consume(string $address): ConsumerBuilder
     {
-        return new ConsumerBuilder($this->session(), $address);
+        return new ConsumerBuilder($this->session(), $address, $this->config->timeout);
     }
 
     public function management(): Management
     {
-        return new Management($this->session());
+        return new Management($this->session(), $this->config->timeout);
     }
 
     private function session(): Session

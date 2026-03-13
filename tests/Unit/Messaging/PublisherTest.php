@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace AMQP10\Tests\Messaging;
 
 use AMQP10\Connection\Session;
+use AMQP10\Exception\MessageTimeoutException;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\Publisher;
 use AMQP10\Messaging\PublisherBuilder;
@@ -165,5 +166,62 @@ class PublisherTest extends TestCase
         }
 
         $this->assertTrue($detachFound, 'PublisherBuilder must send DETACH after publishing');
+    }
+
+    public function test_send_throws_on_timeout(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0,
+            name:    'sender-link',
+            handle:  0,
+            role:    PerformativeEncoder::ROLE_RECEIVER,
+            source:  null,
+            target:  '/queues/test',
+        ));
+        // No DISPOSITION queued — will timeout
+
+        $publisher = new Publisher($session, '/queues/test', timeout: 0.05);
+
+        $this->expectException(MessageTimeoutException::class);
+        $publisher->send(new Message('hello'));
+    }
+
+    public function test_publisher_builder_returns_reusable_publisher(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0,
+            name:    'sender-link',
+            handle:  0,
+            role:    PerformativeEncoder::ROLE_RECEIVER,
+            source:  null,
+            target:  '/queues/test',
+        ));
+        $mock->queueIncoming(PerformativeEncoder::disposition(
+            channel:  0,
+            role:     PerformativeEncoder::ROLE_RECEIVER,
+            first:    0,
+            settled:  true,
+            state:    PerformativeEncoder::accepted(),
+        ));
+        $mock->queueIncoming(PerformativeEncoder::disposition(
+            channel:  0,
+            role:     PerformativeEncoder::ROLE_RECEIVER,
+            first:    1,
+            settled:  true,
+            state:    PerformativeEncoder::accepted(),
+        ));
+
+        $builder   = new PublisherBuilder($session, '/queues/test');
+        $publisher = $builder->publisher();
+        $outcome1  = $publisher->send(new Message('first'));
+        $outcome2  = $publisher->send(new Message('second'));
+        $publisher->close();
+
+        $this->assertTrue($outcome1->isAccepted());
+        $this->assertTrue($outcome2->isAccepted());
     }
 }

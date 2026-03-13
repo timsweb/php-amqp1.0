@@ -35,4 +35,28 @@ class ClientTest extends TestCase
         $this->assertTrue($config->autoReconnect);
         $this->assertSame(3, $config->maxRetries);
     }
+
+    public function test_config_timeout_default(): void
+    {
+        $config = new Config();
+        $this->assertSame(30.0, $config->timeout);
+    }
+
+    public function test_config_with_timeout(): void
+    {
+        $config = new Config();
+        $updated = $config->with(timeout: 5.0);
+        $this->assertSame(5.0, $updated->timeout);
+        $this->assertSame(30.0, $config->timeout); // original unchanged
+    }
+
+    public function test_with_timeout_fluent_method(): void
+    {
+        $client  = new Client('amqp://localhost/');
+        $client2 = $client->withTimeout(10.0);
+
+        $this->assertNotSame($client, $client2);
+        $this->assertSame(10.0, $client2->config()->timeout);
+        $this->assertSame(30.0, $client->config()->timeout);
+    }
 }

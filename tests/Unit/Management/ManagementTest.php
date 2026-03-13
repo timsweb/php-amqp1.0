@@ -224,4 +224,31 @@ class ManagementTest extends TestCase
         // Verify at least one frame was sent (DETACH frames)
         $this->assertNotEmpty($mock->sent());
     }
+
+    public function test_awaitResponse_throws_on_timeout(): void
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'management-link', handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER, source: null, target: '/management',
+        ));
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'management-link', handle: 1,
+            role: PerformativeEncoder::ROLE_SENDER, source: '/management', target: null,
+        ));
+
+        $management = new Management($session, timeout: 0.05);
+        $mock->clearSent();
+
+        // No response queued — should timeout
+        $this->expectException(ManagementException::class);
+        $this->expectExceptionMessage('Timeout');
+        $management->declareQueue(new QueueSpecification('test-queue'));
+    }
 }

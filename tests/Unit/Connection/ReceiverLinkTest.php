@@ -91,7 +91,7 @@ class ReceiverLinkTest extends TestCase
         $mock = new TransportMock();
         $mock->connect('amqp://test');
         $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
-        $session = new Session($mock, channel: 0);
+        $session = new Session($mock, channel: 0, timeout: 0.05);
         $session->begin();
         $link = new ReceiverLink($session, name: 'recv', source: '/queues/test');
 

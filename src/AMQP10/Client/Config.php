@@ -12,19 +12,22 @@ readonly class Config
         public int   $maxRetries    = 5,
         public int   $backoffMs     = 1000,
         public ?Sasl $sasl          = null,
+        public float $timeout       = 30.0,
     ) {}
 
     public function with(
-        ?bool $autoReconnect = null,
-        ?int  $maxRetries    = null,
-        ?int  $backoffMs     = null,
-        ?Sasl $sasl          = null,
+        ?bool  $autoReconnect = null,
+        ?int   $maxRetries    = null,
+        ?int   $backoffMs     = null,
+        ?Sasl  $sasl          = null,
+        ?float $timeout       = null,
     ): self {
         return new self(
             autoReconnect: $autoReconnect ?? $this->autoReconnect,
             maxRetries:    $maxRetries    ?? $this->maxRetries,
             backoffMs:     $backoffMs     ?? $this->backoffMs,
             sasl:          $sasl          ?? $this->sasl,
+            timeout:       $timeout       ?? $this->timeout,
         );
     }
 }

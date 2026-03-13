@@ -9,6 +9,10 @@ class BlockingAdapter implements TransportInterface
     /** @var resource|null */
     private mixed $stream = null;
 
+    public function __construct(
+        private readonly float $timeout = 30.0,
+    ) {}
+
     public function connect(string $uri): void
     {
         $parts = parse_url($uri);
@@ -24,6 +28,7 @@ class BlockingAdapter implements TransportInterface
         }
 
         stream_set_blocking($stream, true);
+        stream_set_timeout($stream, (int) $this->timeout, (int) (($this->timeout - (int) $this->timeout) * 1_000_000));
         $this->stream = $stream;
     }
 

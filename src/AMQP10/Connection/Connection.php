@@ -4,6 +4,7 @@ namespace AMQP10\Connection;
 
 use AMQP10\Exception\AuthenticationException;
 use AMQP10\Exception\ConnectionFailedException;
+use AMQP10\Exception\MessageTimeoutException;
 use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\FrameBuilder;
 use AMQP10\Protocol\FrameParser;
@@ -29,6 +30,7 @@ class Connection
         private readonly TransportInterface $transport,
         private readonly string $uri,
         private readonly ?Sasl $sasl = null,
+        private readonly float $timeout = 30.0,
     ) {
         $this->containerId = 'php-amqp10-' . bin2hex(random_bytes(4));
     }
@@ -149,7 +151,13 @@ class Connection
      */
     private function fillBuffer(int $needed): void
     {
+        $deadline = microtime(true) + $this->timeout;
         while (strlen($this->buffer) < $needed) {
+            if (microtime(true) >= $deadline) {
+                throw new MessageTimeoutException(
+                    "Timeout after {$this->timeout}s waiting for data from broker"
+                );
+            }
             $chunk = $this->transport->read(4096);
             if ($chunk === null) {
                 throw new ConnectionFailedException('Connection closed by peer');

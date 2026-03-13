@@ -168,14 +168,15 @@ class SessionTest extends TestCase
         $this->assertNotNull($frame);
     }
 
-    public function test_readFrameOfType_throws_on_consecutive_empty_reads(): void
+    public function test_readFrameOfType_throws_on_timeout(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
         $mock->setEmptyReadMode(true);
-        $session = new Session($mock, channel: 0);
+        $session = new Session($mock, channel: 0, timeout: 0.05);
 
         $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Timeout');
         $session->readFrameOfType(Descriptor::BEGIN);
     }
 

@@ -14,8 +14,6 @@ class Session
     private int  $nextOutgoingId = 0;
     private int  $nextLinkHandle = 0;
 
-    private const EMPTY_READ_TIMEOUT_THRESHOLD = 100;
-
     private FrameParser $frameParser;
     /** @var array{raw: string, descriptor: ?int}[] */
     private array $pendingFrames = [];
@@ -25,6 +23,7 @@ class Session
         private readonly int $channel,
         private readonly int $incomingWindow = 2048,
         private readonly int $outgoingWindow = 2048,
+        private readonly float $timeout = 30.0,
     ) {
         $this->frameParser = new FrameParser();
     }
@@ -80,17 +79,20 @@ class Session
 
     public function readFrameOfType(int $descriptor): string
     {
-        $consecutiveEmptyReads = 0;
+        $deadline = microtime(true) + $this->timeout;
         while (true) {
             foreach ($this->pendingFrames as $i => $frame) {
                 if ($frame['descriptor'] === $descriptor) {
                     unset($this->pendingFrames[$i]);
-                    // Note: array_values() is O(n) but this is acceptable tradeoff
-                    // to eliminate O(n²) decoding behavior. Total complexity becomes O(n)
-                    // instead of O(n²) when searching through buffered frames.
                     $this->pendingFrames = array_values($this->pendingFrames);
                     return $frame['raw'];
                 }
+            }
+
+            if (microtime(true) >= $deadline) {
+                throw new \RuntimeException(
+                    'Timeout awaiting frame with descriptor 0x' . dechex($descriptor)
+                );
             }
 
             $data = $this->transport->read(4096);
@@ -100,16 +102,9 @@ class Session
                 );
             }
             if ($data === '') {
-                $consecutiveEmptyReads++;
-                if ($consecutiveEmptyReads >= self::EMPTY_READ_TIMEOUT_THRESHOLD) {
-                    throw new \RuntimeException(
-                        'Timeout awaiting frame with descriptor 0x' . dechex($descriptor)
-                    );
-                }
                 usleep(1000);
                 continue;
             }
-            $consecutiveEmptyReads = 0;
             $this->frameParser->feed($data);
             foreach ($this->frameParser->readyFrames() as $frame) {
                 $body = FrameParser::extractBody($frame);

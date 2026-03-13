@@ -81,7 +81,7 @@ class ConsumerTest extends TestCase
             source:  '/queues/test', target: null,
         ));
 
-        $consumer = new Consumer($session, '/queues/test', credit: 5);
+        $consumer = new Consumer($session, '/queues/test', credit: 5, idleTimeout: 0.05);
         $consumer->run(null);
 
         $parser = new FrameParser();
@@ -167,7 +167,7 @@ class ConsumerTest extends TestCase
         ));
 
         $called   = false;
-        $consumer = new Consumer($session, '/queues/test', credit: 1);
+        $consumer = new Consumer($session, '/queues/test', credit: 1, idleTimeout: 0.05);
         $consumer->run(function (Message $msg) use (&$called) {
             $called = true;
         });
@@ -210,7 +210,7 @@ class ConsumerTest extends TestCase
             source:  '/queues/test', target: null,
         ));
 
-        $builder = new ConsumerBuilder($session, '/queues/test');
+        $builder = new ConsumerBuilder($session, '/queues/test', idleTimeout: 0.05);
         $builder->prefetch(20)->run();
 
         $this->assertTrue(true); // no exception = pass
@@ -356,5 +356,25 @@ class ConsumerTest extends TestCase
         $result = $method->invoke($consumer);
 
         $this->assertNull($result);
+    }
+
+    public function test_run_returns_on_idle_timeout(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
+        // No messages queued — should idle-timeout
+
+        $called   = false;
+        $consumer = new Consumer($session, '/queues/test', credit: 1, idleTimeout: 0.05);
+        $consumer->run(function (Message $msg) use (&$called) {
+            $called = true;
+        });
+
+        $this->assertFalse($called, 'Handler must not be called when no messages arrive');
     }
 }

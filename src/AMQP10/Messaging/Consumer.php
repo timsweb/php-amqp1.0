@@ -20,6 +20,7 @@ class Consumer
         private readonly int      $credit       = 10,
         private readonly ?Offset  $offset       = null,
         private readonly ?string  $filterSql    = null,
+        private readonly float    $idleTimeout  = 30.0,
     ) {
         $linkName   = 'receiver-' . bin2hex(random_bytes(4));
         $this->link = new ReceiverLink(
@@ -64,12 +65,21 @@ class Consumer
     {
         $this->link->attach();
 
+        $deadline = microtime(true) + $this->idleTimeout;
         while (true) {
             $frame = $this->session->nextFrame();
             if ($frame === null) {
-                break;
+                if (!$this->session->transport()->isConnected()) {
+                    break;
+                }
+                if (microtime(true) >= $deadline) {
+                    break;
+                }
+                usleep(1000);
+                continue;
             }
             if ($this->getFrameDescriptor($frame) === Descriptor::TRANSFER) {
+                $deadline = microtime(true) + $this->idleTimeout;
                 $this->handleTransfer($frame, $handler, $errorHandler);
             }
         }

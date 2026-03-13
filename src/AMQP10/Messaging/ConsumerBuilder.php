@@ -15,6 +15,7 @@ class ConsumerBuilder
     public function __construct(
         private readonly Session $session,
         private readonly string  $address,
+        private readonly float   $idleTimeout = 30.0,
     ) {}
 
     public function handle(\Closure $handler): self
@@ -54,13 +55,19 @@ class ConsumerBuilder
 
     public function run(): void
     {
-        $consumer = new Consumer(
+        $consumer = $this->consumer();
+        $consumer->run($this->handler, $this->errorHandler);
+    }
+
+    public function consumer(): Consumer
+    {
+        return new Consumer(
             $this->session,
             $this->address,
             $this->credit,
             $this->offset,
             $this->filterSql,
+            $this->idleTimeout,
         );
-        $consumer->run($this->handler, $this->errorHandler);
     }
 }
