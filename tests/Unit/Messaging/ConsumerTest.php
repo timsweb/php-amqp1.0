@@ -279,8 +279,10 @@ class ConsumerTest extends TestCase
         $key = array_key_first($map);
         $value = $map[$key];
 
-        // Raw ulong value — not wrapped in a described type (required by RabbitMQ 4.x)
-        $this->assertSame(5, $value);
+        // Value must be a described type per AMQP 1.0 spec §3.5 (avoids amqp_filter_set_bug compat)
+        $this->assertIsArray($value);
+        $this->assertSame('rabbitmq:stream-offset-spec', $value['descriptor']);
+        $this->assertSame(5, $value['value']);
     }
 
     public function test_buildFilterMap_with_filterSql(): void

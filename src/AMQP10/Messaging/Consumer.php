@@ -46,9 +46,10 @@ class Consumer
                 'timestamp'             => TypeEncoder::encodeTimestamp((int) $this->offset->value),
                 default                 => TypeEncoder::encodeSymbol('first'),
             };
-            // Raw values (not described types) per the filter encoding RabbitMQ 4.x currently honours.
-            // RabbitMQ logs this as "amqp_filter_set_bug" compat mode; revisit when that mode is removed.
-            $pairs[TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec')] = $offsetValue;
+            // Filter-set values must be described types per AMQP 1.0 spec §3.5.
+            // Descriptor is the same symbol as the map key (rabbitmq:stream-offset-spec).
+            $descriptor = TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec');
+            $pairs[$descriptor] = TypeEncoder::encodeDescribed($descriptor, $offsetValue);
         }
 
         if ($this->filterSql !== null) {
