@@ -1,3 +1,4 @@
 vendor/
 .worktrees/
 .phpunit.result.cache
+.claude/
