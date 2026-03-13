@@ -12,6 +12,7 @@ class ConsumerBuilder
     private ?Offset   $offset       = null;
     private ?string   $filterJms = null;
     private ?string   $filterAmqpSql = null;
+    /** @var ?array<string> */
     private ?array $filterBloomValues = null;
     private bool $matchUnfiltered = false;
 
@@ -68,6 +69,7 @@ class ConsumerBuilder
         return $this;
     }
 
+    /** @param string|array<string> $values */
     public function filterBloom(string|array $values, bool $matchUnfiltered = false): self
     {
         $this->filterBloomValues = is_array($values) ? $values : [$values];
