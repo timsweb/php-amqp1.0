@@ -16,16 +16,25 @@ class TypeEncoder
 
     public static function encodeUbyte(int $value): string
     {
-        return pack('CC', TypeCode::UBYTE, $value & 0xFF);
+        if ($value < 0 || $value > 255) {
+            throw new \InvalidArgumentException("ubyte value must be 0..255, got $value");
+        }
+        return pack('CC', TypeCode::UBYTE, $value);
     }
 
     public static function encodeUshort(int $value): string
     {
-        return pack('Cn', TypeCode::USHORT, $value & 0xFFFF);
+        if ($value < 0 || $value > 65535) {
+            throw new \InvalidArgumentException("ushort value must be 0..65535, got $value");
+        }
+        return pack('Cn', TypeCode::USHORT, $value);
     }
 
     public static function encodeUint(int $value): string
     {
+        if ($value < 0) {
+            throw new \InvalidArgumentException("uint value must be >= 0, got $value");
+        }
         if ($value === 0) {
             return "\x43"; // uint0
         }
@@ -37,6 +46,9 @@ class TypeEncoder
 
     public static function encodeUlong(int $value): string
     {
+        if ($value < 0) {
+            throw new \InvalidArgumentException("ulong value must be >= 0, got $value");
+        }
         if ($value === 0) {
             return "\x44"; // ulong0
         }

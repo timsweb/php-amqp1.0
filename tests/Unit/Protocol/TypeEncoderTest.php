@@ -144,4 +144,40 @@ class TypeEncoderTest extends TestCase
         $decoded = ($high << 32) | $low;
         $this->assertSame(1_700_000_000_000, $decoded);
     }
+
+    public function test_encode_ubyte_rejects_negative(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        TypeEncoder::encodeUbyte(-1);
+    }
+
+    public function test_encode_ubyte_rejects_overflow(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        TypeEncoder::encodeUbyte(256);
+    }
+
+    public function test_encode_ushort_rejects_negative(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        TypeEncoder::encodeUshort(-1);
+    }
+
+    public function test_encode_ushort_rejects_overflow(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        TypeEncoder::encodeUshort(65536);
+    }
+
+    public function test_encode_uint_rejects_negative(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        TypeEncoder::encodeUint(-1);
+    }
+
+    public function test_encode_ulong_rejects_negative(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        TypeEncoder::encodeUlong(-1);
+    }
 }
