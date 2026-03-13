@@ -290,7 +290,7 @@ class ConsumerTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
 
-        $consumer = new Consumer($session, '/queues/test', credit: 1, filterSql: "color = 'red'");
+        $consumer = new Consumer($session, '/queues/test', credit: 1, filterAmqpSql: "color = 'red'");
 
         $reflection = new \ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
@@ -309,8 +309,9 @@ class ConsumerTest extends TestCase
         $key = array_key_first($map);
         $value = $map[$key];
 
-        // Raw string value — not wrapped in a described type (required by RabbitMQ 4.x)
-        $this->assertSame("color = 'red'", $value);
+        // Described type: descriptor + string value (RabbitMQ AMQP SQL)
+        $this->assertSame('amqp:sql-filter', $value['descriptor']);
+        $this->assertSame("color = 'red'", $value['value']);
     }
 
     public function test_buildFilterMap_with_offset_and_filterSql(): void
@@ -322,7 +323,7 @@ class ConsumerTest extends TestCase
             '/queues/test',
             credit: 1,
             offset: Offset::offset(10),
-            filterSql: "priority > 5"
+            filterAmqpSql: "priority > 5"
         );
 
         $reflection = new \ReflectionClass($consumer);
@@ -341,7 +342,7 @@ class ConsumerTest extends TestCase
 
         $keys = array_keys($map);
         $this->assertContains('rabbitmq:stream-offset-spec', $keys);
-        $this->assertContains('apache.org:selector-filter:string', $keys);
+        $this->assertContains('amqp:sql-filter', $keys);
     }
 
     public function test_buildFilterMap_returns_null_when_no_filters(): void
@@ -457,5 +458,199 @@ class ConsumerTest extends TestCase
         });
 
         $this->assertFalse($called, 'Handler must not be called when no messages arrive');
+    }
+
+    public function test_buildFilterMap_with_filterJms(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, filterJms: "color = 'red'");
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(1, $map);
+
+        $key = array_key_first($map);
+        $value = $map[$key];
+
+        // Raw string value — not wrapped in a described type (JMS selector)
+        $this->assertSame('apache.org:selector-filter:string', $key);
+        $this->assertSame("color = 'red'", $value);
+    }
+
+    public function test_buildFilterMap_with_filterAmqpSql(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, filterAmqpSql: "priority > 5");
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(1, $map);
+
+        $key = array_key_first($map);
+        $value = $map[$key];
+
+        // Described type: descriptor + string value
+        $this->assertIsArray($value);
+        $this->assertSame('amqp:sql-filter', $value['descriptor']);
+        $this->assertSame('priority > 5', $value['value']);
+    }
+
+    public function test_buildFilterMap_with_filterBloom_single(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, filterBloomValues: ['invoices']);
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(1, $map);
+
+        $key = array_key_first($map);
+        $value = $map[$key];
+
+        // Single value: raw string
+        $this->assertSame('rabbitmq:stream-filter', $key);
+        $this->assertSame('invoices', $value);
+    }
+
+    public function test_buildFilterMap_with_filterBloom_multiple(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, filterBloomValues: ['california', 'texas', 'newyork']);
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(1, $map);
+
+        $key = array_key_first($map);
+        $value = $map[$key];
+
+        // Multiple values: symbol array
+        $this->assertSame('rabbitmq:stream-filter', $key);
+        $this->assertIsArray($value);
+        $this->assertContains('california', $value);
+        $this->assertContains('texas', $value);
+        $this->assertContains('newyork', $value);
+    }
+
+    public function test_buildFilterMap_with_matchUnfiltered(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer($session, '/queues/test', credit: 1, matchUnfiltered: true);
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(1, $map);
+
+        $this->assertArrayHasKey('rabbitmq:stream-match-unfiltered', $map);
+        $this->assertTrue($map['rabbitmq:stream-match-unfiltered']);
+    }
+
+    public function test_buildFilterMap_with_multiple_filters(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $consumer = new Consumer(
+            $session,
+            '/queues/test',
+            credit: 1,
+            offset: Offset::offset(10),
+            filterAmqpSql: "priority > 4",
+            filterBloomValues: ['urgent', 'high-priority'],
+            matchUnfiltered: true
+        );
+
+        $reflection = new \ReflectionClass($consumer);
+        $method = $reflection->getMethod('buildFilterMap');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($consumer);
+
+        $this->assertNotNull($result);
+
+        $decoder = new TypeDecoder($result);
+        $map = $decoder->decode();
+
+        $this->assertIsArray($map);
+        $this->assertCount(4, $map);
+
+        $this->assertArrayHasKey('rabbitmq:stream-offset-spec', $map);
+        $this->assertArrayHasKey('amqp:sql-filter', $map);
+        $this->assertArrayHasKey('rabbitmq:stream-filter', $map);
+        $this->assertArrayHasKey('rabbitmq:stream-match-unfiltered', $map);
+    }
+
+    public function test_filterSql_maps_to_filterAmqpSql(): void
+    {
+        [$mock, $session] = $this->makeSession();
+
+        $builder = new ConsumerBuilder($session, '/queues/test');
+        $builder->filterSql("priority > 5");
+
+        $consumer = $builder->consumer();
+
+        $reflection = new \ReflectionClass($consumer);
+        $filterAmqpSqlProperty = $reflection->getProperty('filterAmqpSql');
+        $filterAmqpSqlProperty->setAccessible(true);
+        $filterJmsProperty = $reflection->getProperty('filterJms');
+        $filterJmsProperty->setAccessible(true);
+
+        // filterSql() should map to filterAmqpSql, not filterJms
+        $this->assertSame("priority > 5", $filterAmqpSqlProperty->getValue($consumer));
+        $this->assertNull($filterJmsProperty->getValue($consumer));
     }
 }

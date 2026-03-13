@@ -233,8 +233,13 @@ $client = (new Client('amqp://localhost:5672/'))
 $client->consume('my-queue')
     ->credit(10)                  // Flow control credit (prefetch)
     ->prefetch(10)                // Alias for credit()
-    ->offset(Offset::offset(100)) // Start from offset 100 (stream queues only)
-    ->filterSql('priority > 5')   // SQL filter (classic/quorum queues only)
+    ->offset(Offset::offset(100))   // Start from offset 100 (stream queues only)
+    // Filter methods:
+    ->filterSql('priority > 5')          // RabbitMQ AMQP SQL (streams only) - shortcut for filterAmqpSql()
+    ->filterAmqpSql('priority > 5')       // RabbitMQ AMQP SQL (streams only) - explicit
+    ->filterJms('priority > 5')           // JMS SQL selector (ActiveMQ/Artemis only)
+    ->filterBloom('value')                // RabbitMQ Bloom filter (streams only)
+    ->filterBloom(['invoices', 'orders'], matchUnfiltered: true)  // Multiple values + match unfiltered
     ->handle(function ($msg, $ctx) {
         // Handle message
         $ctx->accept();
@@ -245,6 +250,44 @@ $client->consume('my-queue')
     })
     ->run();
 ```
+
+**Filter Types:**
+- `filterSql()` / `filterAmqpSql()` - RabbitMQ AMQP SQL filter expression (streams only)
+- `filterJms()` - JMS SQL selector (ActiveMQ/Artemis classic/quorum queues only)
+- `filterBloom()` - RabbitMQ Bloom filter (streams only)
+
+**Note:** `filterSql()` is a convenience method that maps to `filterAmqpSql()` for RabbitMQ streams. For JMS SQL selectors (ActiveMQ/Artemis), use the explicit `filterJms()` method.
+
+## Filter Types Reference
+
+| Filter Method | Descriptor Key | Encoding | Broker Support | Use Case |
+|---------------|----------------|------------|----------------|-----------|
+| `filterSql()` / `filterAmqpSql()` | `amqp:sql-filter` | Described type | RabbitMQ 4.x streams | Server-side SQL filtering with RabbitMQ AMQP SQL syntax |
+| `filterJms()` | `apache.org:selector-filter:string` | Raw string | ActiveMQ/Artemis (JMS brokers) | JMS SQL selector syntax |
+| `filterBloom()` | `rabbitmq:stream-filter` | String (single) or Symbol array (multiple) | RabbitMQ 4.x streams | Efficient chunk-level filtering with Bloom filter |
+| `matchUnfiltered` (via `filterBloom()`) | `rabbitmq:stream-match-unfiltered` | Boolean | RabbitMQ 4.x streams | Include messages without filter value in Bloom filter |
+
+**Filter Details:**
+
+**RabbitMQ AMQP SQL (`filterAmqpSql()`):**
+- Supports SQL WHERE clause syntax on message sections (header, properties, application-properties)
+- Examples: `priority > 4`, `properties.subject = 'order'`, `region IN ('AMER', 'EMEA')`
+- Reference: [RabbitMQ Stream Filtering - Stage 2: AMQP Filter Expressions](https://www.rabbitmq.com/docs/stream-filtering#stage-2-amqp-filter-expressions)
+
+**JMS SQL Selector (`filterJms()`):**
+- Uses Apache JMS selector syntax
+- Examples: `priority > 5`, `color = 'red'`, `region = 'EMEA' AND priority > 3`
+- Only works with JMS-compliant brokers (ActiveMQ, Artemis)
+- Does NOT work with RabbitMQ
+
+**RabbitMQ Bloom Filter (`filterBloom()`):**
+- Highly efficient chunk-level filtering (Stage 1)
+- Publishers set `x-stream-filter-value` annotation on messages
+- Consumers filter by matching filter values
+- Single value: string; Multiple values: logically OR'd together
+- `matchUnfiltered: true` - also receive messages without filter value
+- Can combine with AMQP SQL filter for efficient 2-stage filtering
+- Reference: [RabbitMQ Stream Filtering - Stage 1: Bloom Filter](https://www.rabbitmq.com/docs/stream-filtering#stage-1-bloom-filter)
 
 ## Message Context
 

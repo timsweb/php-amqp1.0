@@ -19,9 +19,12 @@ class Consumer
         private readonly Session  $session,
         string                   $address,
         int                      $credit       = 10,
-        private readonly ?Offset  $offset       = null,
-        private readonly ?string  $filterSql    = null,
-        private readonly float    $idleTimeout  = 30.0,
+        private readonly ?Offset  $offset           = null,
+        private readonly ?string  $filterJms        = null,
+        private readonly ?string  $filterAmqpSql    = null,
+        private readonly ?array   $filterBloomValues = null,
+        private readonly bool     $matchUnfiltered   = false,
+        private readonly float    $idleTimeout      = 30.0,
     ) {
         $linkName   = 'receiver-' . bin2hex(random_bytes(4));
         $this->link = new ReceiverLink(
@@ -35,7 +38,11 @@ class Consumer
 
     private function buildFilterMap(): ?string
     {
-        if ($this->offset === null && $this->filterSql === null) {
+        if ($this->offset === null &&
+            $this->filterJms === null &&
+            $this->filterAmqpSql === null &&
+            $this->filterBloomValues === null &&
+            !$this->matchUnfiltered) {
             return null;
         }
 
@@ -54,9 +61,29 @@ class Consumer
             $pairs[$descriptor] = TypeEncoder::encodeDescribed($descriptor, $offsetValue);
         }
 
-        if ($this->filterSql !== null) {
+        if ($this->filterJms !== null) {
             $pairs[TypeEncoder::encodeSymbol('apache.org:selector-filter:string')] =
-                TypeEncoder::encodeString($this->filterSql);
+                TypeEncoder::encodeString($this->filterJms);
+        }
+
+        if ($this->filterAmqpSql !== null) {
+            $sqlString = TypeEncoder::encodeString($this->filterAmqpSql);
+            $pairs[TypeEncoder::encodeSymbol('amqp:sql-filter')] = $sqlString;
+        }
+
+        if ($this->filterBloomValues !== null) {
+            $descriptor = TypeEncoder::encodeSymbol('rabbitmq:stream-filter');
+            if (count($this->filterBloomValues) === 1) {
+                $value = TypeEncoder::encodeString($this->filterBloomValues[0]);
+            } else {
+                $value = TypeEncoder::encodeSymbolArray($this->filterBloomValues);
+            }
+            $pairs[$descriptor] = $value;
+        }
+
+        if ($this->matchUnfiltered) {
+            $pairs[TypeEncoder::encodeSymbol('rabbitmq:stream-match-unfiltered')] =
+                TypeEncoder::encodeBool(true);
         }
 
         return TypeEncoder::encodeMap($pairs);

@@ -10,7 +10,10 @@ class ConsumerBuilder
     private ?\Closure $errorHandler = null;
     private int       $credit       = 10;
     private ?Offset   $offset       = null;
-    private ?string   $filterSql    = null;
+    private ?string   $filterJms = null;
+    private ?string   $filterAmqpSql = null;
+    private ?array $filterBloomValues = null;
+    private bool $matchUnfiltered = false;
 
     public function __construct(
         private readonly Session $session,
@@ -49,7 +52,26 @@ class ConsumerBuilder
 
     public function filterSql(string $sql): self
     {
-        $this->filterSql = $sql;
+        // Maps to RabbitMQ AMQP SQL for streams (primary use case)
+        return $this->filterAmqpSql($sql);
+    }
+
+    public function filterJms(string $sql): self
+    {
+        $this->filterJms = $sql;
+        return $this;
+    }
+
+    public function filterAmqpSql(string $sql): self
+    {
+        $this->filterAmqpSql = $sql;
+        return $this;
+    }
+
+    public function filterBloom(string|array $values, bool $matchUnfiltered = false): self
+    {
+        $this->filterBloomValues = is_array($values) ? $values : [$values];
+        $this->matchUnfiltered = $matchUnfiltered;
         return $this;
     }
 
@@ -66,7 +88,10 @@ class ConsumerBuilder
             $this->address,
             $this->credit,
             $this->offset,
-            $this->filterSql,
+            $this->filterJms,
+            $this->filterAmqpSql,
+            $this->filterBloomValues,
+            $this->matchUnfiltered,
             $this->idleTimeout,
         );
     }
