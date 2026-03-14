@@ -27,4 +27,9 @@ class DeliveryContext
     {
         $this->link->settle($this->deliveryId, PerformativeEncoder::released());
     }
+
+    public function modify(bool $deliveryFailed = true, bool $undeliverableHere = true): void
+    {
+        $this->link->settle($this->deliveryId, PerformativeEncoder::modified($deliveryFailed, $undeliverableHere));
+    }
 }

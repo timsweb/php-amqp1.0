@@ -195,6 +195,15 @@ class PerformativeEncoder
         return self::described(Descriptor::RELEASED, []);
     }
 
+    public static function modified(bool $deliveryFailed = true, bool $undeliverableHere = true): string
+    {
+        $fields = [
+            TypeEncoder::encodeBool($deliveryFailed),
+            TypeEncoder::encodeBool($undeliverableHere),
+        ];
+        return self::described(Descriptor::MODIFIED, $fields);
+    }
+
     /**
      * @param array<int, string> $mechanisms
      */
