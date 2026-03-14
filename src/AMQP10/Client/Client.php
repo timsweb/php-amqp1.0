@@ -14,10 +14,11 @@ use AMQP10\Transport\TransportInterface;
 
 class Client
 {
-    private ?Connection         $connection      = null;
-    private ?Session            $session         = null;
+    private ?Connection         $connection        = null;
+    private ?Session            $session           = null;
     /** @phpstan-ignore-next-line */
-    private ?TransportInterface $activeTransport = null;
+    private ?TransportInterface $activeTransport   = null;
+    private ?string             $heartbeatTimerId  = null;
 
     public function __construct(
         private readonly string $uri,
@@ -43,22 +44,49 @@ class Client
         $this->session    = new Session($transport, channel: 0, timeout: $this->config->timeout);
         $this->session->begin();
 
+        // Schedule heartbeat at half the negotiated idle timeout
+        $idleMs = $connection->negotiatedIdleTimeout();
+        if ($idleMs > 0) {
+            $intervalSec    = ($idleMs / 2) / 1000;
+            $activeTransport = $transport;
+            $this->heartbeatTimerId = \Revolt\EventLoop::repeat(
+                $intervalSec,
+                static function () use ($activeTransport): void {
+                    try {
+                        $activeTransport->send(\AMQP10\Protocol\FrameBuilder::keepalive());
+                    } catch (\Throwable) {
+                        // Connection lost — let the next read detect it
+                    }
+                }
+            );
+        }
+
         return $this;
     }
 
     public function reconnect(): static
     {
+        $this->cancelHeartbeat();
         $this->close();
         return $this->connect();
     }
 
     public function close(): void
     {
+        $this->cancelHeartbeat();
         $this->session?->end();
         $this->connection?->close();
-        $this->connection    = null;
-        $this->session       = null;
+        $this->connection      = null;
+        $this->session         = null;
         $this->activeTransport = null;
+    }
+
+    private function cancelHeartbeat(): void
+    {
+        if ($this->heartbeatTimerId !== null) {
+            \Revolt\EventLoop::cancel($this->heartbeatTimerId);
+            $this->heartbeatTimerId = null;
+        }
     }
 
     public function isConnected(): bool

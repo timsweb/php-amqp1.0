@@ -25,6 +25,15 @@ class FrameBuilder
     }
 
     /**
+     * Empty AMQP frame — used as a keepalive/heartbeat.
+     * Spec §2.3: a frame with zero-length body satisfies the idle-timeout requirement.
+     */
+    public static function keepalive(): string
+    {
+        return self::heartbeat();
+    }
+
+    /**
      * Build an AMQP performative frame (TYPE=0x00).
      * @param int    $channel Session channel number (0 for connection-level)
      * @param string $body    Pre-encoded performative body

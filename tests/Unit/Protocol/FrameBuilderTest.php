@@ -85,4 +85,18 @@ class FrameBuilderTest extends TestCase
         $this->assertSame(8, strlen(FrameBuilder::saslProtocolHeader()));
         $this->assertSame(8, strlen(FrameBuilder::amqpProtocolHeader()));
     }
+
+    public function test_keepalive_is_8_bytes(): void
+    {
+        $frame = FrameBuilder::keepalive();
+        $this->assertSame(8, strlen($frame));
+    }
+
+    public function test_keepalive_has_zero_body_size(): void
+    {
+        $frame = FrameBuilder::keepalive();
+        // Bytes 0-3 = frame size (big-endian uint32) = 8
+        $size = unpack('N', substr($frame, 0, 4))[1];
+        $this->assertSame(8, $size);
+    }
 }
