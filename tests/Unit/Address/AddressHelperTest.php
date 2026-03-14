@@ -1,6 +1,8 @@
 <?php
+
 declare(strict_types=1);
 // tests/Unit/Address/AddressHelperTest.php
+
 namespace AMQP10\Tests\Address;
 
 use AMQP10\Address\AddressHelper;

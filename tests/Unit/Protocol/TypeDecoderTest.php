@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Protocol;
 
 use AMQP10\Exception\FrameException;
@@ -85,22 +87,22 @@ class TypeDecoderTest extends TestCase
     public function test_roundtrip_string(): void
     {
         $original = 'hello world';
-        $encoded  = TypeEncoder::encodeString($original);
-        $decoder  = new TypeDecoder($encoded);
+        $encoded = TypeEncoder::encodeString($original);
+        $decoder = new TypeDecoder($encoded);
         $this->assertSame($original, $decoder->decode());
     }
 
     public function test_roundtrip_ulong(): void
     {
         $original = 0x10;
-        $encoded  = TypeEncoder::encodeUlong($original);
-        $decoder  = new TypeDecoder($encoded);
+        $encoded = TypeEncoder::encodeUlong($original);
+        $decoder = new TypeDecoder($encoded);
         $this->assertSame($original, $decoder->decode());
     }
 
     public function test_multiple_sequential_decodes(): void
     {
-        $data    = TypeEncoder::encodeNull() . TypeEncoder::encodeString('hi');
+        $data = TypeEncoder::encodeNull() . TypeEncoder::encodeString('hi');
         $decoder = new TypeDecoder($data);
         $this->assertNull($decoder->decode());
         $this->assertSame('hi', $decoder->decode());
@@ -108,7 +110,7 @@ class TypeDecoderTest extends TestCase
 
     public function test_remaining_bytes_after_decode(): void
     {
-        $data    = TypeEncoder::encodeNull() . TypeEncoder::encodeString('extra');
+        $data = TypeEncoder::encodeNull() . TypeEncoder::encodeString('extra');
         $decoder = new TypeDecoder($data);
         $decoder->decode(); // consume null
         $this->assertGreaterThan(0, $decoder->remaining());

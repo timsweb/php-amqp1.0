@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Messaging;
 
 use AMQP10\Protocol\Descriptor;
@@ -34,15 +36,15 @@ class MessageEncoder
 
         // Message annotations section
         $annotations = $message->annotations();
-        if (!empty($annotations)) {
+        if (! empty($annotations)) {
             $pairs = [];
             foreach ($annotations as $key => $value) {
-                $encodedKey   = TypeEncoder::encodeSymbol((string)$key);
+                $encodedKey = TypeEncoder::encodeSymbol((string) $key);
                 $encodedValue = match (true) {
-                    is_null($value)  => TypeEncoder::encodeNull(),
-                    is_bool($value)  => TypeEncoder::encodeBool($value),
-                    is_int($value)   => TypeEncoder::encodeUlong($value),
-                    default          => TypeEncoder::encodeString((string)$value),
+                    is_null($value) => TypeEncoder::encodeNull(),
+                    is_bool($value) => TypeEncoder::encodeBool($value),
+                    is_int($value) => TypeEncoder::encodeUlong($value),
+                    default => TypeEncoder::encodeString((string) $value),
                 };
                 $pairs[$encodedKey] = $encodedValue;
             }
@@ -51,7 +53,7 @@ class MessageEncoder
 
         // Properties section (spec §3.2.4)
         $props = $message->properties();
-        if (!empty($props) || $message->subject() !== null) {
+        if (! empty($props) || $message->subject() !== null) {
             $sections .= self::section(Descriptor::MSG_PROPERTIES, [
                 isset($props['message-id'])
                     ? TypeEncoder::encodeString($props['message-id'])
@@ -82,10 +84,10 @@ class MessageEncoder
 
         // Application properties section
         $appProps = $message->applicationProperties();
-        if (!empty($appProps)) {
+        if (! empty($appProps)) {
             $pairs = [];
             foreach ($appProps as $key => $value) {
-                $pairs[TypeEncoder::encodeString($key)] = TypeEncoder::encodeString((string)$value);
+                $pairs[TypeEncoder::encodeString($key)] = TypeEncoder::encodeString((string) $value);
             }
             $sections .= self::sectionMap(Descriptor::MSG_APPLICATION_PROPS, $pairs);
         }
@@ -100,7 +102,7 @@ class MessageEncoder
     }
 
     /**
-     * @param array<int, string> $fields
+     * @param  array<int, string>  $fields
      */
     private static function section(int $descriptor, array $fields): string
     {
@@ -111,7 +113,7 @@ class MessageEncoder
     }
 
     /**
-     * @param array<string, string> $pairs
+     * @param  array<string, string>  $pairs
      */
     private static function sectionMap(int $descriptor, array $pairs): string
     {

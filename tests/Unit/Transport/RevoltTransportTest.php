@@ -1,10 +1,14 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Unit\Transport;
 
-use AMQP10\Transport\RevoltTransport;
 use AMQP10\Exception\ConnectionFailedException;
+use AMQP10\Transport\RevoltTransport;
 use PHPUnit\Framework\TestCase;
+use Revolt\EventLoop;
+use ReflectionProperty;
 
 class RevoltTransportTest extends TestCase
 {
@@ -12,10 +16,11 @@ class RevoltTransportTest extends TestCase
     {
         $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
         $this->assertNotFalse($pair);
+
         return $pair;
     }
 
-    public function test_isConnected_returns_false_before_connect(): void
+    public function test_is_connected_returns_false_before_connect(): void
     {
         $t = new RevoltTransport();
         $this->assertFalse($t->isConnected());
@@ -41,16 +46,16 @@ class RevoltTransportTest extends TestCase
         stream_set_blocking($b, true);
 
         $t = new RevoltTransport();
-        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
         $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 
-        \Revolt\EventLoop::run(function () use ($t, $b) {
+        EventLoop::run(function () use ($t, $b) {
             $t->send('hello');
             $received = fread($b, 4096);
             $this->assertSame('hello', $received);
-            \Revolt\EventLoop::stop();
+            EventLoop::stop();
         });
 
         fclose($b);
@@ -62,16 +67,16 @@ class RevoltTransportTest extends TestCase
         stream_set_blocking($b, true);
 
         $t = new RevoltTransport(readTimeout: 1.0);
-        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
         $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 
-        \Revolt\EventLoop::run(function () use ($t, $b) {
+        EventLoop::run(function () use ($t, $b) {
             fwrite($b, 'world');
             $data = $t->read(4096);
             $this->assertSame('world', $data);
-            \Revolt\EventLoop::stop();
+            EventLoop::stop();
         });
 
         fclose($b);
@@ -82,15 +87,15 @@ class RevoltTransportTest extends TestCase
         [$a, $b] = $this->socketPair();
 
         $t = new RevoltTransport(readTimeout: 0.05);
-        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
         $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 
-        \Revolt\EventLoop::run(function () use ($t, $b) {
+        EventLoop::run(function () use ($t) {
             $data = $t->read(4096);
             $this->assertSame('', $data);
-            \Revolt\EventLoop::stop();
+            EventLoop::stop();
         });
 
         fclose($b);
@@ -101,17 +106,17 @@ class RevoltTransportTest extends TestCase
         [$a, $b] = $this->socketPair();
 
         $t = new RevoltTransport(readTimeout: 1.0);
-        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
         $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 
-        \Revolt\EventLoop::run(function () use ($t, $b) {
+        EventLoop::run(function () use ($t, $b) {
             fclose($b);
-            \Revolt\EventLoop::delay(0.02, function () use ($t) {
+            EventLoop::delay(0.02, function () use ($t) {
                 $data = $t->read(4096);
                 $this->assertNull($data);
-                \Revolt\EventLoop::stop();
+                EventLoop::stop();
             });
         });
     }
@@ -122,7 +127,7 @@ class RevoltTransportTest extends TestCase
         stream_set_blocking($b, true);
 
         $t = new RevoltTransport();
-        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
         $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);

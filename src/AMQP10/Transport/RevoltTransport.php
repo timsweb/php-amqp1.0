@@ -1,9 +1,13 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Transport;
 
 use AMQP10\Exception\ConnectionFailedException;
 use Revolt\EventLoop;
+use Fiber;
+use Throwable;
 
 class RevoltTransport implements TransportInterface
 {
@@ -11,22 +15,22 @@ class RevoltTransport implements TransportInterface
     private mixed $stream = null;
 
     /**
-     * @param array<string, mixed> $tlsOptions
+     * @param  array<string, mixed>  $tlsOptions
      */
     public function __construct(
         private readonly float $readTimeout = 30.0,
-        private readonly array $tlsOptions  = [],
+        private readonly array $tlsOptions = [],
     ) {}
 
     public function connect(string $uri): void
     {
-        $parts   = parse_url($uri);
-        $host    = $parts['host'] ?? 'localhost';
-        $port    = $parts['port'] ?? 5672;
-        $tls     = ($parts['scheme'] ?? 'amqp') === 'amqps';
+        $parts = parse_url($uri);
+        $host = $parts['host'] ?? 'localhost';
+        $port = $parts['port'] ?? 5672;
+        $tls = ($parts['scheme'] ?? 'amqp') === 'amqps';
         $address = ($tls ? 'ssl' : 'tcp') . "://$host:$port";
 
-        $context = ($tls && !empty($this->tlsOptions))
+        $context = ($tls && ! empty($this->tlsOptions))
             ? stream_context_create(['ssl' => $this->tlsOptions])
             : stream_context_create();
 
@@ -53,19 +57,20 @@ class RevoltTransport implements TransportInterface
         if ($this->stream === null) {
             throw new ConnectionFailedException('Not connected');
         }
-        if (\Fiber::getCurrent() !== null) {
+        if (Fiber::getCurrent() !== null) {
             $this->sendInFiber($bytes);
+
             return;
         }
         $exception = null;
-        \Revolt\EventLoop::queue(function () use ($bytes, &$exception): void {
+        EventLoop::queue(function () use ($bytes, &$exception): void {
             try {
                 $this->sendInFiber($bytes);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $exception = $e;
             }
         });
-        \Revolt\EventLoop::run();
+        EventLoop::run();
         if ($exception !== null) {
             throw $exception;
         }
@@ -76,28 +81,29 @@ class RevoltTransport implements TransportInterface
         if ($this->stream === null) {
             throw new ConnectionFailedException('Not connected');
         }
-        if (\Fiber::getCurrent() !== null) {
+        if (Fiber::getCurrent() !== null) {
             return $this->readInFiber($length);
         }
-        $result    = null;
+        $result = null;
         $exception = null;
-        \Revolt\EventLoop::queue(function () use ($length, &$result, &$exception): void {
+        EventLoop::queue(function () use ($length, &$result, &$exception): void {
             try {
                 $result = $this->readInFiber($length);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $exception = $e;
             }
         });
-        \Revolt\EventLoop::run();
+        EventLoop::run();
         if ($exception !== null) {
             throw $exception;
         }
+
         return $result;
     }
 
     private function sendInFiber(string $bytes): void
     {
-        $total  = strlen($bytes);
+        $total = strlen($bytes);
         $offset = 0;
         while ($offset < $total) {
             $written = @fwrite($this->stream, substr($bytes, $offset));
@@ -106,9 +112,9 @@ class RevoltTransport implements TransportInterface
             }
             if ($written === 0) {
                 $suspension = EventLoop::getSuspension();
-                $resolved   = false;
+                $resolved = false;
                 $id = EventLoop::onWritable($this->stream, function () use ($suspension, &$resolved) {
-                    if (!$resolved) {
+                    if (! $resolved) {
                         $resolved = true;
                         $suspension->resume();
                     }
@@ -137,16 +143,16 @@ class RevoltTransport implements TransportInterface
 
         // No data yet — suspend until readable or timeout fires
         $suspension = EventLoop::getSuspension();
-        $resolved   = false;
+        $resolved = false;
 
         $readId = EventLoop::onReadable($this->stream, function () use ($suspension, &$resolved) {
-            if (!$resolved) {
+            if (! $resolved) {
                 $resolved = true;
                 $suspension->resume(true);
             }
         });
         $timeoutId = EventLoop::delay($this->readTimeout, function () use ($suspension, &$resolved) {
-            if (!$resolved) {
+            if (! $resolved) {
                 $resolved = true;
                 $suspension->resume(false);
             }
@@ -156,7 +162,7 @@ class RevoltTransport implements TransportInterface
         EventLoop::cancel($readId);
         EventLoop::cancel($timeoutId);
 
-        if (!$hasData) {
+        if (! $hasData) {
             return '';
         }
 
@@ -164,11 +170,12 @@ class RevoltTransport implements TransportInterface
         if ($data === false || ($data === '' && feof($this->stream))) {
             return null;
         }
+
         return $data;
     }
 
     public function isConnected(): bool
     {
-        return $this->stream !== null && !feof($this->stream);
+        return $this->stream !== null && ! feof($this->stream);
     }
 }

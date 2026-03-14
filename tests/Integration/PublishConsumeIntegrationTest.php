@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Tests\Integration;
@@ -7,6 +8,7 @@ use AMQP10\Address\AddressHelper;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
 use AMQP10\Messaging\Message;
+use Throwable;
 
 class PublishConsumeIntegrationTest extends RabbitMqTestCase
 {
@@ -28,7 +30,10 @@ class PublishConsumeIntegrationTest extends RabbitMqTestCase
         $this->runInEventLoop(function (): void {
             $client = $this->newClient()->connect();
             $mgmt = $client->management();
-            try { $mgmt->deleteQueue($this->queueName); } catch (\Throwable) {}
+            try {
+                $mgmt->deleteQueue($this->queueName);
+            } catch (Throwable) {
+            }
             $mgmt->close();
             $client->close();
         });
@@ -38,7 +43,7 @@ class PublishConsumeIntegrationTest extends RabbitMqTestCase
     {
         $accepted = false;
         $this->runInEventLoop(function () use (&$accepted): void {
-            $client  = $this->newClient()->connect();
+            $client = $this->newClient()->connect();
             $address = AddressHelper::queueAddress($this->queueName);
             $outcome = $client->publish($address)->send(new Message('hello world'));
             $accepted = $outcome->isAccepted();
@@ -51,7 +56,7 @@ class PublishConsumeIntegrationTest extends RabbitMqTestCase
     {
         $received = null;
         $this->runInEventLoop(function () use (&$received): void {
-            $client  = $this->newClient()->connect();
+            $client = $this->newClient()->connect();
             $address = AddressHelper::queueAddress($this->queueName);
 
             // publish
@@ -75,9 +80,9 @@ class PublishConsumeIntegrationTest extends RabbitMqTestCase
     {
         $accepted = false;
         $this->runInEventLoop(function () use (&$accepted): void {
-            $client  = $this->newClient()->connect();
+            $client = $this->newClient()->connect();
             $address = AddressHelper::queueAddress($this->queueName);
-            $msg     = new Message('body', applicationProperties: ['correlation-id' => 'test-123', 'priority' => '1']);
+            $msg = new Message('body', applicationProperties: ['correlation-id' => 'test-123', 'priority' => '1']);
             $outcome = $client->publish($address)->send($msg);
             $accepted = $outcome->isAccepted();
             $client->close();

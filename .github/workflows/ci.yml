@@ -30,3 +30,6 @@ jobs:
 
       - name: Run PHPStan
         run: vendor/bin/phpstan analyse
+
+      - name: Run Laravel Pint
+        run: ./vendor/bin/pint --test

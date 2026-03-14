@@ -1,8 +1,7 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Exception;
 
-class ConnectionFailedException extends ConnectionException
-{
-}
+class ConnectionFailedException extends ConnectionException {}

@@ -1,10 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Tests\Messaging;
 
 use AMQP10\Messaging\Outcome;
-use AMQP10\Messaging\OutcomeState;
 use PHPUnit\Framework\TestCase;
 
 class OutcomeTest extends TestCase

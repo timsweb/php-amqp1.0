@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Messaging;
 
 use AMQP10\Client\Client;
@@ -13,52 +15,60 @@ use AMQP10\Protocol\TypeDecoder;
 use AMQP10\Protocol\TypeEncoder;
 use AMQP10\Terminus\ExpiryPolicy;
 use AMQP10\Terminus\TerminusDurability;
+use Revolt\EventLoop;
+use Closure;
+use RuntimeException;
+use Throwable;
 
 class Consumer
 {
-    private ?ReceiverLink $link          = null;
-    private bool          $attached      = false;
-    private bool          $stopRequested = false;
-    private int           $received      = 0;
+    private ?ReceiverLink $link = null;
+
+    private bool $attached = false;
+
+    private bool $stopRequested = false;
+
+    private int $received = 0;
 
     /** @var array<int, string> */
     private array $partialDeliveries = [];
 
     public function __construct(
-        private readonly Client              $client,
-        private readonly string              $address,
-        private readonly int                 $credit             = 10,
-        private readonly ?Offset             $offset             = null,
-        private readonly ?string             $filterJms          = null,
-        private readonly ?string             $filterAmqpSql      = null,
+        private readonly Client $client,
+        private readonly string $address,
+        private readonly int $credit = 10,
+        private readonly ?Offset $offset = null,
+        private readonly ?string $filterJms = null,
+        private readonly ?string $filterAmqpSql = null,
         /** @var ?array<string> */
-        private readonly ?array              $filterBloomValues  = null,
-        private readonly bool                $matchUnfiltered    = false,
-        private readonly float               $idleTimeout        = 30.0,
-        private readonly ?string             $linkName           = null,
-        private readonly ?TerminusDurability $durable            = null,
-        private readonly ?ExpiryPolicy       $expiryPolicy       = null,
-        private readonly int                 $reconnectRetries   = 0,
-        private readonly int                 $reconnectBackoffMs = 1000,
+        private readonly ?array $filterBloomValues = null,
+        private readonly bool $matchUnfiltered = false,
+        private readonly float $idleTimeout = 30.0,
+        private readonly ?string $linkName = null,
+        private readonly ?TerminusDurability $durable = null,
+        private readonly ?ExpiryPolicy $expiryPolicy = null,
+        private readonly int $reconnectRetries = 0,
+        private readonly int $reconnectBackoffMs = 1000,
     ) {}
 
     private function buildLink(Session $session): ReceiverLink
     {
         $name = $this->linkName ?? ('receiver-' . bin2hex(random_bytes(4)));
+
         return new ReceiverLink(
-            session:       $session,
-            name:          $name,
-            source:        $this->address,
+            session: $session,
+            name: $name,
+            source: $this->address,
             initialCredit: $this->credit,
-            filterMap:     $this->buildFilterMap(),
-            durable:       $this->durable,
-            expiryPolicy:  $this->expiryPolicy,
+            filterMap: $this->buildFilterMap(),
+            durable: $this->durable,
+            expiryPolicy: $this->expiryPolicy,
         );
     }
 
     private function ensureAttached(): void
     {
-        if (!$this->attached) {
+        if (! $this->attached) {
             $this->link = $this->buildLink($this->client->session());
             $this->link->attach();
             $this->attached = true;
@@ -72,10 +82,10 @@ class Consumer
 
     public function reattach(Session $session): void
     {
-        $this->link          = $this->buildLink($session);
+        $this->link = $this->buildLink($session);
         $this->link->attach();
-        $this->attached      = true;
-        $this->received      = 0;
+        $this->attached = true;
+        $this->received = 0;
         $this->stopRequested = false;
     }
 
@@ -83,7 +93,7 @@ class Consumer
     {
         $this->ensureAttached();
 
-        $deadline  = microtime(true) + $this->idleTimeout;
+        $deadline = microtime(true) + $this->idleTimeout;
         $replenish = (int) floor($this->credit / 2);
 
         while (true) {
@@ -92,12 +102,13 @@ class Consumer
             }
             $frame = $this->client->session()->nextFrame();
             if ($frame === null) {
-                if (!$this->client->session()->transport()->isConnected()) {
+                if (! $this->client->session()->transport()->isConnected()) {
                     return null;
                 }
                 if (microtime(true) >= $deadline) {
                     return null;
                 }
+
                 continue;
             }
 
@@ -122,16 +133,17 @@ class Consumer
 
     private function handleTransferFrame(string $frame): ?Delivery
     {
-        $body         = FrameParser::extractBody($frame);
-        $decoder      = new TypeDecoder($body);
+        $body = FrameParser::extractBody($frame);
+        $decoder = new TypeDecoder($body);
         $performative = $decoder->decode();
 
         $deliveryId = $performative['value'][1] ?? 0;
-        $more       = $performative['value'][5] ?? false;
+        $more = $performative['value'][5] ?? false;
         $msgPayload = substr($body, $decoder->offset());
 
         if ($more) {
             $this->partialDeliveries[$deliveryId] = ($this->partialDeliveries[$deliveryId] ?? '') . $msgPayload;
+
             return null;
         }
 
@@ -141,12 +153,12 @@ class Consumer
         }
 
         $message = MessageDecoder::decode($msgPayload);
-        $ctx     = new DeliveryContext($deliveryId, $this->link);
+        $ctx = new DeliveryContext($deliveryId, $this->link);
 
         return new Delivery($message, $ctx);
     }
 
-    public function run(?\Closure $handler, ?\Closure $errorHandler = null): void
+    public function run(?Closure $handler, ?Closure $errorHandler = null): void
     {
         $attempts = 0;
         while (true) {
@@ -155,7 +167,7 @@ class Consumer
                     if ($handler !== null) {
                         try {
                             $handler($delivery->message(), $delivery->context());
-                        } catch (\Throwable $e) {
+                        } catch (Throwable $e) {
                             if ($errorHandler !== null) {
                                 $errorHandler($e);
                             }
@@ -163,14 +175,14 @@ class Consumer
                     }
                 }
                 break;
-            } catch (ConnectionFailedException|\RuntimeException $e) {
+            } catch (ConnectionFailedException|RuntimeException $e) {
                 if ($this->reconnectRetries === 0 || $attempts >= $this->reconnectRetries) {
                     throw $e;
                 }
                 $attempts++;
                 $backoff = $this->reconnectBackoffMs * $attempts;
-                $suspension = \Revolt\EventLoop::getSuspension();
-                \Revolt\EventLoop::delay($backoff / 1000, static function () use ($suspension): void {
+                $suspension = EventLoop::getSuspension();
+                EventLoop::delay($backoff / 1000, static function () use ($suspension): void {
                     $suspension->resume();
                 });
                 $suspension->suspend();
@@ -186,7 +198,7 @@ class Consumer
     {
         try {
             $this->link?->detach();
-        } catch (\Throwable) {
+        } catch (Throwable) {
         }
         $this->attached = false;
     }
@@ -197,8 +209,9 @@ class Consumer
             return null;
         }
         try {
-            $body         = FrameParser::extractBody($frame);
+            $body = FrameParser::extractBody($frame);
             $performative = (new TypeDecoder($body))->decode();
+
             return is_array($performative) ? ($performative['descriptor'] ?? null) : null;
         } catch (FrameException) {
             return null;
@@ -207,11 +220,11 @@ class Consumer
 
     private function buildFilterMap(): ?string
     {
-        if ($this->offset === null &&
-            $this->filterJms === null &&
-            $this->filterAmqpSql === null &&
-            $this->filterBloomValues === null &&
-            !$this->matchUnfiltered) {
+        if ($this->offset === null
+            && $this->filterJms === null
+            && $this->filterAmqpSql === null
+            && $this->filterBloomValues === null
+            && ! $this->matchUnfiltered) {
             return null;
         }
 
@@ -220,9 +233,9 @@ class Consumer
         if ($this->offset !== null) {
             $offsetValue = match ($this->offset->type) {
                 'first', 'last', 'next' => TypeEncoder::encodeSymbol($this->offset->type),
-                'offset'                => TypeEncoder::encodeUlong((int) $this->offset->value),
-                'timestamp'             => TypeEncoder::encodeTimestamp((int) $this->offset->value),
-                default                 => TypeEncoder::encodeSymbol('first'),
+                'offset' => TypeEncoder::encodeUlong((int) $this->offset->value),
+                'timestamp' => TypeEncoder::encodeTimestamp((int) $this->offset->value),
+                default => TypeEncoder::encodeSymbol('first'),
             };
             // Filter-set values must be described types per AMQP 1.0 spec §3.5.
             // Descriptor is the same symbol as the map key (rabbitmq:stream-offset-spec).
@@ -231,14 +244,14 @@ class Consumer
         }
 
         if ($this->filterJms !== null) {
-            $pairs[TypeEncoder::encodeSymbol('apache.org:selector-filter:string')] =
-                TypeEncoder::encodeString($this->filterJms);
+            $pairs[TypeEncoder::encodeSymbol('apache.org:selector-filter:string')]
+                = TypeEncoder::encodeString($this->filterJms);
         }
 
         if ($this->filterAmqpSql !== null) {
-            $mapKey     = TypeEncoder::encodeSymbol('sql-filter');
+            $mapKey = TypeEncoder::encodeSymbol('sql-filter');
             $descriptor = TypeEncoder::encodeSymbol('amqp:sql-filter');
-            $sqlString  = TypeEncoder::encodeString($this->filterAmqpSql);
+            $sqlString = TypeEncoder::encodeString($this->filterAmqpSql);
             $pairs[$mapKey] = TypeEncoder::encodeDescribed($descriptor, $sqlString);
         }
 

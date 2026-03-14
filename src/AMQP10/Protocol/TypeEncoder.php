@@ -1,6 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Protocol;
+
+use InvalidArgumentException;
 
 class TypeEncoder
 {
@@ -17,23 +21,25 @@ class TypeEncoder
     public static function encodeUbyte(int $value): string
     {
         if ($value < 0 || $value > 255) {
-            throw new \InvalidArgumentException("ubyte value must be 0..255, got $value");
+            throw new InvalidArgumentException("ubyte value must be 0..255, got $value");
         }
+
         return pack('CC', TypeCode::UBYTE, $value);
     }
 
     public static function encodeUshort(int $value): string
     {
         if ($value < 0 || $value > 65535) {
-            throw new \InvalidArgumentException("ushort value must be 0..65535, got $value");
+            throw new InvalidArgumentException("ushort value must be 0..65535, got $value");
         }
+
         return pack('Cn', TypeCode::USHORT, $value);
     }
 
     public static function encodeUint(int $value): string
     {
         if ($value < 0) {
-            throw new \InvalidArgumentException("uint value must be >= 0, got $value");
+            throw new InvalidArgumentException("uint value must be >= 0, got $value");
         }
         if ($value === 0) {
             return "\x43"; // uint0
@@ -41,13 +47,14 @@ class TypeEncoder
         if ($value <= 0xFF) {
             return pack('CC', TypeCode::UINT_SMALL, $value);
         }
+
         return pack('CN', TypeCode::UINT, $value);
     }
 
     public static function encodeUlong(int $value): string
     {
         if ($value < 0) {
-            throw new \InvalidArgumentException("ulong value must be >= 0, got $value");
+            throw new InvalidArgumentException("ulong value must be >= 0, got $value");
         }
         if ($value === 0) {
             return "\x44"; // ulong0
@@ -57,7 +64,8 @@ class TypeEncoder
         }
         // 8-byte big-endian: split into two uint32
         $high = ($value >> 32) & 0xFFFFFFFF;
-        $low  = $value & 0xFFFFFFFF;
+        $low = $value & 0xFFFFFFFF;
+
         return pack('C', TypeCode::ULONG) . pack('NN', $high, $low);
     }
 
@@ -67,6 +75,7 @@ class TypeEncoder
         if ($len <= 0xFF) {
             return pack('CC', TypeCode::STR8, $len) . $value;
         }
+
         return pack('CN', TypeCode::STR32, $len) . $value;
     }
 
@@ -76,6 +85,7 @@ class TypeEncoder
         if ($len <= 0xFF) {
             return pack('CC', TypeCode::SYM8, $len) . $value;
         }
+
         return pack('CN', TypeCode::SYM32, $len) . $value;
     }
 
@@ -85,6 +95,7 @@ class TypeEncoder
         if ($len <= 0xFF) {
             return pack('CC', TypeCode::VBIN8, $len) . $value;
         }
+
         return pack('CN', TypeCode::VBIN32, $len) . $value;
     }
 
@@ -97,7 +108,8 @@ class TypeEncoder
      * Encode a list of pre-encoded AMQP values.
      * list8:  constructor(1) + size(1) + count(1) + items
      *   size = count-byte(1) + len(items)
-     * @param string[] $items Pre-encoded AMQP values
+     *
+     * @param  string[]  $items  Pre-encoded AMQP values
      */
     public static function encodeList(array $items): string
     {
@@ -105,7 +117,7 @@ class TypeEncoder
             return "\x45"; // list0
         }
 
-        $body  = implode('', $items);
+        $body = implode('', $items);
         $count = count($items);
         $size8 = 1 + strlen($body); // 1 = count byte
 
@@ -114,12 +126,14 @@ class TypeEncoder
         }
 
         $size32 = 4 + strlen($body); // 4 = count uint32
+
         return pack('CNN', TypeCode::LIST32, $size32, $count) . $body;
     }
 
     /**
      * Encode a map of pre-encoded key=>value AMQP pairs.
-     * @param array<string, string> $pairs Pre-encoded key => pre-encoded value
+     *
+     * @param  array<string, string>  $pairs  Pre-encoded key => pre-encoded value
      */
     public static function encodeMap(array $pairs): string
     {
@@ -127,10 +141,10 @@ class TypeEncoder
             return pack('CCC', TypeCode::MAP8, 1, 0);
         }
 
-        $body  = '';
+        $body = '';
         $count = 0;
         foreach ($pairs as $key => $value) {
-            $body  .= $key . $value;
+            $body .= $key . $value;
             $count += 2;
         }
 
@@ -140,6 +154,7 @@ class TypeEncoder
         }
 
         $size32 = 4 + strlen($body);
+
         return pack('CNN', TypeCode::MAP32, $size32, $count) . $body;
     }
 
@@ -147,13 +162,14 @@ class TypeEncoder
      * Encode an array of symbols sharing the sym8 constructor.
      * array8: constructor(1) + size(1) + count(1) + element-constructor(1) + payloads
      *   size = count(1) + element-constructor(1) + len(all-payloads)
-     * @param string[] $symbols
+     *
+     * @param  string[]  $symbols
      */
     public static function encodeSymbolArray(array $symbols): string
     {
         foreach ($symbols as $sym) {
             if (strlen($sym) > 0xFF) {
-                throw new \InvalidArgumentException('Symbol exceeds 255 bytes; use encodeSymbol separately for large symbols');
+                throw new InvalidArgumentException('Symbol exceeds 255 bytes; use encodeSymbol separately for large symbols');
             }
         }
 
@@ -174,6 +190,7 @@ class TypeEncoder
 
         // array32: size(4) + count(4) + constructor(1) + payloads
         $size32 = 4 + 1 + strlen($elementPayloads);
+
         return pack('CNN', TypeCode::ARRAY32, $size32, $count)
              . pack('C', TypeCode::SYM8)
              . $elementPayloads;

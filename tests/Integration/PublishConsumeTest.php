@@ -1,17 +1,20 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Tests\Integration;
 
 use AMQP10\Address\AddressHelper;
+use AMQP10\Client\Client;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\OutcomeState;
+use Throwable;
 
 class PublishConsumeTest extends RabbitMqTestCase
 {
-    private \AMQP10\Client\Client $client;
+    private Client $client;
 
     protected function setUp(): void
     {
@@ -28,28 +31,31 @@ class PublishConsumeTest extends RabbitMqTestCase
     public function test_publish_message_is_accepted(): void
     {
         $queueName = 'tc-publish-accepted';
-        $address   = AddressHelper::queueAddress($queueName);
+        $address = AddressHelper::queueAddress($queueName);
 
         $mgmt = $this->client->management();
         $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::CLASSIC));
         $mgmt->close();
 
         $publisher = $this->client->publish($address);
-        $outcome   = $publisher->send(Message::create('hello-world'));
+        $outcome = $publisher->send(Message::create('hello-world'));
         $publisher->close();
 
         $this->assertTrue($outcome->isAccepted());
 
         // Cleanup
         $mgmt = $this->client->management();
-        try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+        try {
+            $mgmt->deleteQueue($queueName);
+        } catch (Throwable) {
+        }
         $mgmt->close();
     }
 
     public function test_publish_and_consume_basic_message(): void
     {
         $queueName = 'tc-publish-consume';
-        $address   = AddressHelper::queueAddress($queueName);
+        $address = AddressHelper::queueAddress($queueName);
 
         $mgmt = $this->client->management();
         $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::CLASSIC));
@@ -74,21 +80,24 @@ class PublishConsumeTest extends RabbitMqTestCase
 
         // Cleanup
         $mgmt = $this->client->management();
-        try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+        try {
+            $mgmt->deleteQueue($queueName);
+        } catch (Throwable) {
+        }
         $mgmt->close();
     }
 
     public function test_durable_message_with_subject(): void
     {
         $queueName = 'tc-durable';
-        $address   = AddressHelper::queueAddress($queueName);
+        $address = AddressHelper::queueAddress($queueName);
 
         $mgmt = $this->client->management();
         $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::CLASSIC));
         $mgmt->close();
 
         $publisher = $this->client->publish($address);
-        $msg       = Message::create('{"orderId":1}')
+        $msg = Message::create('{"orderId":1}')
             ->withSubject('order.placed')
             ->withDurable(true)
             ->withContentType('application/json');
@@ -99,14 +108,17 @@ class PublishConsumeTest extends RabbitMqTestCase
 
         // Cleanup
         $mgmt = $this->client->management();
-        try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+        try {
+            $mgmt->deleteQueue($queueName);
+        } catch (Throwable) {
+        }
         $mgmt->close();
     }
 
     public function test_fire_and_forget_returns_accepted_immediately(): void
     {
         $queueName = 'tc-fire-forget';
-        $address   = AddressHelper::queueAddress($queueName);
+        $address = AddressHelper::queueAddress($queueName);
 
         $mgmt = $this->client->management();
         $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::CLASSIC));
@@ -127,7 +139,10 @@ class PublishConsumeTest extends RabbitMqTestCase
 
         // Cleanup
         $mgmt = $this->client->management();
-        try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+        try {
+            $mgmt->deleteQueue($queueName);
+        } catch (Throwable) {
+        }
         $mgmt->close();
     }
 }

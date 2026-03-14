@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Client;
@@ -9,17 +10,25 @@ use AMQP10\Connection\Session;
 use AMQP10\Management\Management;
 use AMQP10\Messaging\ConsumerBuilder;
 use AMQP10\Messaging\PublisherBuilder;
+use AMQP10\Protocol\FrameBuilder;
 use AMQP10\Transport\RevoltTransport;
 use AMQP10\Transport\TransportInterface;
+use Revolt\EventLoop;
+use RuntimeException;
+use Throwable;
 
 class Client
 {
-    private ?Connection         $connection        = null;
-    private ?Session            $session           = null;
+    private ?Connection $connection = null;
+
+    private ?Session $session = null;
+
     /** @phpstan-ignore-next-line */
-    private ?TransportInterface $activeTransport   = null;
-    private ?string             $heartbeatTimerId  = null;
-    private ?Management         $management        = null;
+    private ?TransportInterface $activeTransport = null;
+
+    private ?string $heartbeatTimerId = null;
+
+    private ?Management $management = null;
 
     public function __construct(
         private readonly string $uri,
@@ -32,9 +41,9 @@ class Client
      */
     public function connect(): static
     {
-        $transport  = $this->transport ?? new RevoltTransport(
+        $transport = $this->transport ?? new RevoltTransport(
             readTimeout: $this->config->timeout,
-            tlsOptions:  $this->config->tlsOptions,
+            tlsOptions: $this->config->tlsOptions,
         );
         $this->activeTransport = $transport;
 
@@ -42,27 +51,27 @@ class Client
         $connection->open();
 
         $this->connection = $connection;
-        $this->session    = new Session($transport, channel: 0, timeout: $this->config->timeout);
+        $this->session = new Session($transport, channel: 0, timeout: $this->config->timeout);
         $this->session->begin();
 
         // Schedule heartbeat at half the negotiated idle timeout
         $idleMs = $connection->negotiatedIdleTimeout();
         if ($idleMs > 0) {
-            $intervalSec    = ($idleMs / 2) / 1000;
+            $intervalSec = ($idleMs / 2) / 1000;
             $activeTransport = $transport;
-            $this->heartbeatTimerId = \Revolt\EventLoop::repeat(
+            $this->heartbeatTimerId = EventLoop::repeat(
                 $intervalSec,
                 static function () use ($activeTransport): void {
                     try {
-                        $activeTransport->send(\AMQP10\Protocol\FrameBuilder::keepalive());
-                    } catch (\Throwable) {
+                        $activeTransport->send(FrameBuilder::keepalive());
+                    } catch (Throwable) {
                         // Connection lost — let the next read detect it
                     }
                 }
             );
             // Unreference so the heartbeat doesn't prevent the event loop from stopping
             // when there's no other work to do (e.g. after a one-shot publish).
-            \Revolt\EventLoop::unreference($this->heartbeatTimerId);
+            EventLoop::unreference($this->heartbeatTimerId);
         }
 
         return $this;
@@ -72,6 +81,7 @@ class Client
     {
         $this->management = null;
         $this->close();
+
         return $this->connect();
     }
 
@@ -79,18 +89,18 @@ class Client
     {
         $this->cancelHeartbeat();
         $this->management?->close();
-        $this->management      = null;
+        $this->management = null;
         $this->session?->end();
         $this->connection?->close();
-        $this->connection      = null;
-        $this->session         = null;
+        $this->connection = null;
+        $this->session = null;
         $this->activeTransport = null;
     }
 
     private function cancelHeartbeat(): void
     {
         if ($this->heartbeatTimerId !== null) {
-            \Revolt\EventLoop::cancel($this->heartbeatTimerId);
+            EventLoop::cancel($this->heartbeatTimerId);
             $this->heartbeatTimerId = null;
         }
     }
@@ -104,23 +114,26 @@ class Client
 
     public function withSasl(Sasl $sasl): static
     {
-        $clone         = clone $this;
+        $clone = clone $this;
         $clone->config = $this->config->with(sasl: $sasl);
+
         return $clone;
     }
 
     public function withTimeout(float $timeout): static
     {
-        $clone         = clone $this;
+        $clone = clone $this;
         $clone->config = $this->config->with(timeout: $timeout);
+
         return $clone;
     }
 
     /** @param array<string, mixed> $options */
     public function withTlsOptions(array $options): static
     {
-        $clone         = clone $this;
+        $clone = clone $this;
         $clone->config = $this->config->with(tlsOptions: $options);
+
         return $clone;
     }
 
@@ -151,14 +164,16 @@ class Client
         if ($this->management === null) {
             $this->management = new Management($this->session(), $this->config->timeout);
         }
+
         return $this->management;
     }
 
     public function session(): Session
     {
         if ($this->session === null) {
-            throw new \RuntimeException('Call connect() before using the client');
+            throw new RuntimeException('Call connect() before using the client');
         }
+
         return $this->session;
     }
 }

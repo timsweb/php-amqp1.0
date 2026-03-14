@@ -1,20 +1,22 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Unit\Messaging;
 
 use AMQP10\Connection\SenderLink;
 use AMQP10\Connection\Session;
 use AMQP10\Protocol\FrameParser;
 use AMQP10\Protocol\TypeDecoder;
-use AMQP10\Protocol\Descriptor;
 use AMQP10\Transport\TransportInterface;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 
 class MultiFrameTransferTest extends TestCase
 {
     public function test_large_payload_split_into_multiple_frames(): void
     {
-        $frames    = [];
+        $frames = [];
         $transport = $this->createMock(TransportInterface::class);
         $transport->method('isConnected')->willReturn(true);
         $transport->expects($this->atLeastOnce())
@@ -33,7 +35,7 @@ class MultiFrameTransferTest extends TestCase
         $link = new SenderLink($session, name: 'test', target: '/queues/q', maxFrameSize: 512);
 
         // Inject as attached via reflection
-        $ref = new \ReflectionProperty(SenderLink::class, 'attached');
+        $ref = new ReflectionProperty(SenderLink::class, 'attached');
         $ref->setAccessible(true);
         $ref->setValue($link, true);
 

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Address;
@@ -25,6 +26,7 @@ class AddressHelper
         if ($routingKey === '') {
             return "/exchanges/$exchange";
         }
+
         return "/exchanges/$exchange/" . self::encode($routingKey);
     }
 
@@ -49,6 +51,7 @@ class AddressHelper
                 $result .= '%' . strtoupper(sprintf('%02X', ord($char)));
             }
         }
+
         return $result;
     }
 }

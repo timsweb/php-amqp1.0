@@ -64,6 +64,24 @@ Integration tests connect to `amqp://guest:guest@localhost:5672/`. See `tests/In
 
 ---
 
+## Style Checking
+
+This project uses **Laravel Pint** with the **PER 3.0** preset for automated style checking and fixes.
+
+```bash
+# Check code style
+./vendor/bin/pint --test
+
+# Auto-fix style issues
+./vendor/bin/pint
+```
+
+**PER 3.0** (PHP-ECMA-Reference) is a modern, opinionated coding standard based on PSR-12 but with stricter rules. See the [PER specification](https://github.com/php-fig/per) for details.
+
+Style checking runs automatically in CI via `./vendor/bin/pint --test`. New code should pass Pint before committing.
+
+---
+
 ## Conventions
 
 - All files have `declare(strict_types=1)` at the top.

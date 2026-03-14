@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Connection;
 
 use AMQP10\Connection\ReceiverLink;
@@ -11,6 +13,7 @@ use AMQP10\Protocol\TypeDecoder;
 use AMQP10\Protocol\TypeEncoder;
 use AMQP10\Tests\Mocks\TransportMock;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class ReceiverLinkTest extends TestCase
 {
@@ -22,6 +25,7 @@ class ReceiverLinkTest extends TestCase
         $session = new Session($mock, channel: 0);
         $session->begin();
         $mock->clearSent();
+
         return [$mock, $session];
     }
 
@@ -29,9 +33,12 @@ class ReceiverLinkTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
         $link = new ReceiverLink($session, name: 'recv', source: '/queues/test');
         $link->attach();
@@ -50,23 +57,25 @@ class ReceiverLinkTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/streams/mystream', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/streams/mystream',
+            target: null,
         ));
 
         $filterMap = TypeEncoder::encodeMap([
-            TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec') =>
-                TypeEncoder::encodeDescribed(
-                    TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec'),
-                    TypeEncoder::encodeSymbol('first'),
-                ),
+            TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec') => TypeEncoder::encodeDescribed(
+                TypeEncoder::encodeSymbol('rabbitmq:stream-offset-spec'),
+                TypeEncoder::encodeSymbol('first'),
+            ),
         ]);
 
         $link = new ReceiverLink(
             $session,
-            name:      'recv',
-            source:    '/streams/mystream',
+            name: 'recv',
+            source: '/streams/mystream',
             filterMap: $filterMap,
         );
         $link->attach();
@@ -95,7 +104,7 @@ class ReceiverLinkTest extends TestCase
         $session->begin();
         $link = new ReceiverLink($session, name: 'recv', source: '/queues/test');
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $link->attach();
     }
 }

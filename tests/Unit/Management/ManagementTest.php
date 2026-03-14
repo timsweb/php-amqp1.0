@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Management;
 
 use AMQP10\Connection\Session;
@@ -35,19 +37,19 @@ class ManagementTest extends TestCase
         // These will be consumed (and skipped as non-TRANSFER frames) during awaitResponse.
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'management-link',
-            handle:  0,
-            role:    PerformativeEncoder::ROLE_RECEIVER, // server's perspective
-            source:  null,
-            target:  '/management',
+            name: 'management-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER, // server's perspective
+            source: null,
+            target: '/management',
         ));
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'management-link',
-            handle:  1,
-            role:    PerformativeEncoder::ROLE_SENDER, // server's perspective
-            source:  '/management',
-            target:  null,
+            name: 'management-link',
+            handle: 1,
+            role: PerformativeEncoder::ROLE_SENDER, // server's perspective
+            source: '/management',
+            target: null,
         ));
 
         $management = new Management($session);
@@ -87,15 +89,15 @@ class ManagementTest extends TestCase
             TypeEncoder::encodeBinary($body),
         );
 
-        $payload     = $propertiesSection . $dataSection;
+        $payload = $propertiesSection . $dataSection;
         $deliveryTag = pack('N', 0);
         $mock->queueIncoming(PerformativeEncoder::transfer(
-            channel:        0,
-            handle:         1,
-            deliveryId:     0,
-            deliveryTag:    $deliveryTag,
+            channel: 0,
+            handle: 1,
+            deliveryId: 0,
+            deliveryTag: $deliveryTag,
             messagePayload: $payload,
-            settled:        true,
+            settled: true,
         ));
     }
 
@@ -225,7 +227,7 @@ class ManagementTest extends TestCase
         $this->assertNotEmpty($mock->sent());
     }
 
-    public function test_awaitResponse_throws_on_timeout(): void
+    public function test_await_response_throws_on_timeout(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
@@ -235,12 +237,20 @@ class ManagementTest extends TestCase
         $mock->clearSent();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'management-link', handle: 0,
-            role: PerformativeEncoder::ROLE_RECEIVER, source: null, target: '/management',
+            channel: 0,
+            name: 'management-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            source: null,
+            target: '/management',
         ));
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'management-link', handle: 1,
-            role: PerformativeEncoder::ROLE_SENDER, source: '/management', target: null,
+            channel: 0,
+            name: 'management-link',
+            handle: 1,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/management',
+            target: null,
         ));
 
         $management = new Management($session, timeout: 0.05);

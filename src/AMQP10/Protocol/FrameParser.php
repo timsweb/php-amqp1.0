@@ -1,6 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Protocol;
+
+use AMQP10\Exception\FrameException;
 
 /**
  * Parses AMQP 1.0 frames from a raw byte stream.
@@ -19,6 +23,7 @@ class FrameParser
     public const MAX_FRAME_SIZE = 1_048_576; // 1 MB
 
     private string $buffer = '';
+
     /** @var string[] */
     private array $ready = [];
 
@@ -32,12 +37,14 @@ class FrameParser
     /**
      * Return all complete frames available since last call.
      * Clears the internal queue.
+     *
      * @return string[]
      */
     public function readyFrames(): array
     {
-        $frames      = $this->ready;
+        $frames = $this->ready;
         $this->ready = [];
+
         return $frames;
     }
 
@@ -60,6 +67,7 @@ class FrameParser
     public static function extractBody(string $frame): string
     {
         $doff = ord($frame[4]);
+
         return substr($frame, $doff * 4);
     }
 
@@ -68,20 +76,20 @@ class FrameParser
         while (strlen($this->buffer) >= 4) {
             $size = unpack('N', substr($this->buffer, 0, 4))[1];
             if ($size < 8) {
-                throw new \AMQP10\Exception\FrameException(
+                throw new FrameException(
                     "Frame size $size is below minimum (8 bytes)"
                 );
             }
             if ($size > self::MAX_FRAME_SIZE) {
-                throw new \AMQP10\Exception\FrameException(
-                    "Frame size $size exceeds maximum (" . self::MAX_FRAME_SIZE . " bytes)"
+                throw new FrameException(
+                    "Frame size $size exceeds maximum (" . self::MAX_FRAME_SIZE . ' bytes)'
                 );
             }
             if (strlen($this->buffer) < $size) {
                 break; // incomplete frame — wait for more data
             }
             $this->ready[] = substr($this->buffer, 0, $size);
-            $this->buffer  = substr($this->buffer, $size);
+            $this->buffer = substr($this->buffer, $size);
         }
     }
 }

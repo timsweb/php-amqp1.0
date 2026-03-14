@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Connection;
 
 use AMQP10\Connection\SenderLink;
@@ -10,6 +12,7 @@ use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeDecoder;
 use AMQP10\Tests\Mocks\TransportMock;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class SenderLinkTest extends TestCase
 {
@@ -21,6 +24,7 @@ class SenderLinkTest extends TestCase
         $session = new Session($mock, channel: 0);
         $session->begin();
         $mock->clearSent();
+
         return [$mock, $session];
     }
 
@@ -28,9 +32,12 @@ class SenderLinkTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'my-sender', handle: 0,
+            channel: 0,
+            name: 'my-sender',
+            handle: 0,
             role: PerformativeEncoder::ROLE_RECEIVER,
-            source: null, target: '/exchanges/test/key',
+            source: null,
+            target: '/exchanges/test/key',
         ));
         $link = new SenderLink($session, name: 'my-sender', target: '/exchanges/test/key');
         $link->attach();
@@ -47,9 +54,12 @@ class SenderLinkTest extends TestCase
     {
         [$mock, $session] = $this->makeSession();
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'l', handle: 0,
+            channel: 0,
+            name: 'l',
+            handle: 0,
             role: PerformativeEncoder::ROLE_RECEIVER,
-            source: null, target: '/q/test',
+            source: null,
+            target: '/q/test',
         ));
         $link = new SenderLink($session, name: 'l', target: '/q/test');
         $link->attach();
@@ -65,11 +75,11 @@ class SenderLinkTest extends TestCase
 
     public function test_attach_throws_when_server_does_not_respond(): void
     {
-        $mock    = new TransportMock();
+        $mock = new TransportMock();
         $session = new Session($mock, channel: 0);
-        $link    = new SenderLink($session, name: 'l', target: '/queues/test');
+        $link = new SenderLink($session, name: 'l', target: '/queues/test');
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $link->attach();
     }
 }
