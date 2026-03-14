@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Protocol;
 
 use AMQP10\Exception\FrameException;
@@ -11,7 +13,7 @@ class FrameParserTest extends TestCase
 {
     public function test_parse_single_complete_frame(): void
     {
-        $frame  = FrameBuilder::heartbeat();
+        $frame = FrameBuilder::heartbeat();
         $parser = new FrameParser();
         $parser->feed($frame);
         $frames = $parser->readyFrames();
@@ -21,8 +23,8 @@ class FrameParserTest extends TestCase
 
     public function test_parse_frame_with_body(): void
     {
-        $body   = "\x00\x53\x10\x45";
-        $frame  = FrameBuilder::amqp(channel: 0, body: $body);
+        $body = "\x00\x53\x10\x45";
+        $frame = FrameBuilder::amqp(channel: 0, body: $body);
         $parser = new FrameParser();
         $parser->feed($frame);
         $frames = $parser->readyFrames();
@@ -32,7 +34,7 @@ class FrameParserTest extends TestCase
 
     public function test_partial_header_produces_no_frames(): void
     {
-        $frame  = FrameBuilder::heartbeat();
+        $frame = FrameBuilder::heartbeat();
         $parser = new FrameParser();
         $parser->feed(substr($frame, 0, 4));
         $this->assertEmpty($parser->readyFrames());
@@ -40,8 +42,8 @@ class FrameParserTest extends TestCase
 
     public function test_partial_body_produces_no_frames(): void
     {
-        $body   = str_repeat("\x40", 20);
-        $frame  = FrameBuilder::amqp(channel: 0, body: $body);
+        $body = str_repeat("\x40", 20);
+        $frame = FrameBuilder::amqp(channel: 0, body: $body);
         $parser = new FrameParser();
         $parser->feed(substr($frame, 0, 15));
         $this->assertEmpty($parser->readyFrames());
@@ -49,7 +51,7 @@ class FrameParserTest extends TestCase
 
     public function test_frame_split_across_two_feeds(): void
     {
-        $frame  = FrameBuilder::amqp(channel: 0, body: "\x00\x53\x10\x45");
+        $frame = FrameBuilder::amqp(channel: 0, body: "\x00\x53\x10\x45");
         $parser = new FrameParser();
         $parser->feed(substr($frame, 0, 6));
         $this->assertEmpty($parser->readyFrames());
@@ -81,8 +83,8 @@ class FrameParserTest extends TestCase
 
     public function test_extract_body_from_frame(): void
     {
-        $body   = "\x00\x53\x10\x45";
-        $frame  = FrameBuilder::amqp(channel: 0, body: $body);
+        $body = "\x00\x53\x10\x45";
+        $frame = FrameBuilder::amqp(channel: 0, body: $body);
         $parser = new FrameParser();
         $parser->feed($frame);
         $frames = $parser->readyFrames();
@@ -91,7 +93,7 @@ class FrameParserTest extends TestCase
 
     public function test_extract_channel_from_frame(): void
     {
-        $frame  = FrameBuilder::amqp(channel: 7, body: '');
+        $frame = FrameBuilder::amqp(channel: 7, body: '');
         $parser = new FrameParser();
         $parser->feed($frame);
         $frames = $parser->readyFrames();
@@ -132,7 +134,7 @@ class FrameParserTest extends TestCase
     public function test_accepts_frame_at_max_size(): void
     {
         // Build a valid frame with body exactly at max minus header
-        $body  = str_repeat("\x40", FrameParser::MAX_FRAME_SIZE - 8);
+        $body = str_repeat("\x40", FrameParser::MAX_FRAME_SIZE - 8);
         $frame = FrameBuilder::amqp(channel: 0, body: $body);
         $parser = new FrameParser();
         $parser->feed($frame);

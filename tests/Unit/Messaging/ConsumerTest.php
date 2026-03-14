@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Messaging;
 
 use AMQP10\Connection\Session;
@@ -9,14 +11,18 @@ use AMQP10\Messaging\Delivery;
 use AMQP10\Messaging\DeliveryContext;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\MessageEncoder;
+use AMQP10\Messaging\Offset;
 use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\FrameParser;
 use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeDecoder;
 use AMQP10\Tests\Mocks\ClientMock;
 use AMQP10\Tests\Mocks\TransportMock;
-use AMQP10\Messaging\Offset;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionProperty;
+use RuntimeException;
+use Throwable;
 
 class ConsumerTest extends TestCase
 {
@@ -30,6 +36,7 @@ class ConsumerTest extends TestCase
         $session->begin();
         $mock->clearSent();
         $client = new ClientMock($session);
+
         return [$mock, $session, $client];
     }
 
@@ -39,13 +46,14 @@ class ConsumerTest extends TestCase
     private function makeTransferFrame(int $channel, string $text, int $deliveryId = 0): string
     {
         $messagePayload = MessageEncoder::encode(new Message($text));
+
         return PerformativeEncoder::transfer(
-            channel:        $channel,
-            handle:         0,
-            deliveryId:     $deliveryId,
-            deliveryTag:    pack('N', $deliveryId),
+            channel: $channel,
+            handle: 0,
+            deliveryId: $deliveryId,
+            deliveryTag: pack('N', $deliveryId),
             messagePayload: $messagePayload,
-            settled:        false,
+            settled: false,
         );
     }
 
@@ -54,9 +62,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'hello', deliveryId: 0));
 
@@ -80,9 +91,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
 
         $consumer = new Consumer($client, '/queues/test', credit: 5, idleTimeout: 0.05);
@@ -101,7 +115,7 @@ class ConsumerTest extends TestCase
         }
 
         $this->assertContains(Descriptor::ATTACH, $descriptors, 'Consumer must send ATTACH');
-        $this->assertContains(Descriptor::FLOW,   $descriptors, 'Consumer must send FLOW (credit grant)');
+        $this->assertContains(Descriptor::FLOW, $descriptors, 'Consumer must send FLOW (credit grant)');
         $this->assertContains(Descriptor::DETACH, $descriptors, 'Consumer must send DETACH on exit');
     }
 
@@ -110,15 +124,18 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
-        $mock->queueIncoming($this->makeTransferFrame(0, 'first',  deliveryId: 0));
+        $mock->queueIncoming($this->makeTransferFrame(0, 'first', deliveryId: 0));
         $mock->queueIncoming($this->makeTransferFrame(0, 'second', deliveryId: 1));
 
         $received = [];
-        $count    = 0;
+        $count = 0;
 
         $consumer = new Consumer($client, '/queues/test', credit: 10);
         $consumer->run(function (Message $msg, DeliveryContext $ctx) use (&$received, &$count, $mock) {
@@ -137,9 +154,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'boom', deliveryId: 0));
 
@@ -149,9 +169,9 @@ class ConsumerTest extends TestCase
         $consumer->run(
             function (Message $msg, DeliveryContext $ctx) use ($mock) {
                 $mock->disconnect();
-                throw new \RuntimeException('handler failed');
+                throw new RuntimeException('handler failed');
             },
-            function (\Throwable $e) use (&$errors) {
+            function (Throwable $e) use (&$errors) {
                 $errors[] = $e->getMessage();
             }
         );
@@ -165,12 +185,15 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
 
-        $called   = false;
+        $called = false;
         $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 0.05);
         $consumer->run(function (Message $msg) use (&$called) {
             $called = true;
@@ -184,9 +207,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'built', deliveryId: 0));
 
@@ -209,9 +235,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
 
         $builder = new ConsumerBuilder($client, '/queues/test', idleTimeout: 0.05);
@@ -220,7 +249,7 @@ class ConsumerTest extends TestCase
         $this->assertTrue(true); // no exception = pass
     }
 
-    public function test_getFrameDescriptor_returns_transfer_descriptor(): void
+    public function test_get_frame_descriptor_returns_transfer_descriptor(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
@@ -228,15 +257,15 @@ class ConsumerTest extends TestCase
 
         $messagePayload = MessageEncoder::encode(new Message('test'));
         $transferFrame = PerformativeEncoder::transfer(
-            channel:        0,
-            handle:         0,
-            deliveryId:     0,
-            deliveryTag:    pack('N', 0),
+            channel: 0,
+            handle: 0,
+            deliveryId: 0,
+            deliveryTag: pack('N', 0),
             messagePayload: $messagePayload,
-            settled:        false,
+            settled: false,
         );
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('getFrameDescriptor');
         $method->setAccessible(true);
 
@@ -245,13 +274,13 @@ class ConsumerTest extends TestCase
         $this->assertSame(Descriptor::TRANSFER, $result);
     }
 
-    public function test_getFrameDescriptor_handles_malformed_frame(): void
+    public function test_get_frame_descriptor_handles_malformed_frame(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $consumer = new Consumer($client, '/queues/test', credit: 1);
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('getFrameDescriptor');
         $method->setAccessible(true);
 
@@ -260,13 +289,13 @@ class ConsumerTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function test_buildFilterMap_with_offset(): void
+    public function test_build_filter_map_with_offset(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, offset: Offset::offset(5));
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -289,13 +318,13 @@ class ConsumerTest extends TestCase
         $this->assertSame(5, $value['value']);
     }
 
-    public function test_buildFilterMap_with_filterSql(): void
+    public function test_build_filter_map_with_filter_sql(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, filterAmqpSql: "color = 'red'");
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -317,7 +346,7 @@ class ConsumerTest extends TestCase
         $this->assertSame("color = 'red'", $value['value']);
     }
 
-    public function test_buildFilterMap_with_offset_and_filterSql(): void
+    public function test_build_filter_map_with_offset_and_filter_sql(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
@@ -326,10 +355,10 @@ class ConsumerTest extends TestCase
             '/queues/test',
             credit: 1,
             offset: Offset::offset(10),
-            filterAmqpSql: "priority > 5"
+            filterAmqpSql: 'priority > 5'
         );
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -348,13 +377,13 @@ class ConsumerTest extends TestCase
         $this->assertContains('sql-filter', $keys);
     }
 
-    public function test_buildFilterMap_returns_null_when_no_filters(): void
+    public function test_build_filter_map_returns_null_when_no_filters(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $consumer = new Consumer($client, '/queues/test', credit: 1);
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -368,9 +397,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'hello', deliveryId: 0));
 
@@ -378,7 +410,7 @@ class ConsumerTest extends TestCase
         $delivery = $consumer->receive();
 
         $this->assertNotNull($delivery);
-        $this->assertInstanceOf(\AMQP10\Messaging\Delivery::class, $delivery);
+        $this->assertInstanceOf(Delivery::class, $delivery);
         $this->assertSame('hello', $delivery->message()->body());
         $this->assertInstanceOf(DeliveryContext::class, $delivery->context());
 
@@ -390,9 +422,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 0.05);
@@ -407,18 +442,21 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
-        $mock->queueIncoming($this->makeTransferFrame(0, 'first',  deliveryId: 0));
+        $mock->queueIncoming($this->makeTransferFrame(0, 'first', deliveryId: 0));
         $mock->queueIncoming($this->makeTransferFrame(0, 'second', deliveryId: 1));
 
         $consumer = new Consumer($client, '/queues/test', credit: 10, idleTimeout: 0.05);
         $d1 = $consumer->receive();
         $d2 = $consumer->receive();
 
-        $this->assertSame('first',  $d1->message()->body());
+        $this->assertSame('first', $d1->message()->body());
         $this->assertSame('second', $d2->message()->body());
         $consumer->close();
     }
@@ -428,13 +466,16 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
         $mock->queueIncoming($this->makeTransferFrame(0, 'via-builder', deliveryId: 0));
 
-        $builder  = new ConsumerBuilder($client, '/queues/test', idleTimeout: 0.05);
+        $builder = new ConsumerBuilder($client, '/queues/test', idleTimeout: 0.05);
         $consumer = $builder->consumer();
         $delivery = $consumer->receive();
 
@@ -448,13 +489,16 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
         // No messages queued — should idle-timeout
 
-        $called   = false;
+        $called = false;
         $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 0.05);
         $consumer->run(function (Message $msg) use (&$called) {
             $called = true;
@@ -463,13 +507,13 @@ class ConsumerTest extends TestCase
         $this->assertFalse($called, 'Handler must not be called when no messages arrive');
     }
 
-    public function test_buildFilterMap_with_filterJms(): void
+    public function test_build_filter_map_with_filter_jms(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, filterJms: "color = 'red'");
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -491,13 +535,13 @@ class ConsumerTest extends TestCase
         $this->assertSame("color = 'red'", $value);
     }
 
-    public function test_buildFilterMap_with_filterAmqpSql(): void
+    public function test_build_filter_map_with_filter_amqp_sql(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
-        $consumer = new Consumer($client, '/queues/test', credit: 1, filterAmqpSql: "priority > 5");
+        $consumer = new Consumer($client, '/queues/test', credit: 1, filterAmqpSql: 'priority > 5');
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -520,13 +564,13 @@ class ConsumerTest extends TestCase
         $this->assertSame('priority > 5', $value['value']);
     }
 
-    public function test_buildFilterMap_with_filterBloom_single(): void
+    public function test_build_filter_map_with_filter_bloom_single(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, filterBloomValues: ['invoices']);
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -550,13 +594,13 @@ class ConsumerTest extends TestCase
         $this->assertSame('invoices', $value['value']);
     }
 
-    public function test_buildFilterMap_with_filterBloom_multiple(): void
+    public function test_build_filter_map_with_filter_bloom_multiple(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, filterBloomValues: ['california', 'texas', 'newyork']);
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -583,13 +627,13 @@ class ConsumerTest extends TestCase
         $this->assertContains('newyork', $value['value']);
     }
 
-    public function test_buildFilterMap_with_matchUnfiltered(): void
+    public function test_build_filter_map_with_match_unfiltered(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, matchUnfiltered: true);
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -610,7 +654,7 @@ class ConsumerTest extends TestCase
         $this->assertTrue($unfiltered['value']);
     }
 
-    public function test_buildFilterMap_with_multiple_filters(): void
+    public function test_build_filter_map_with_multiple_filters(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
@@ -619,12 +663,12 @@ class ConsumerTest extends TestCase
             '/queues/test',
             credit: 1,
             offset: Offset::offset(10),
-            filterAmqpSql: "priority > 4",
+            filterAmqpSql: 'priority > 4',
             filterBloomValues: ['urgent', 'high-priority'],
             matchUnfiltered: true
         );
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
         $method->setAccessible(true);
 
@@ -644,23 +688,23 @@ class ConsumerTest extends TestCase
         $this->assertArrayHasKey('rabbitmq:stream-match-unfiltered', $map);
     }
 
-    public function test_filterSql_maps_to_filterAmqpSql(): void
+    public function test_filter_sql_maps_to_filter_amqp_sql(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
         $builder = new ConsumerBuilder($client, '/queues/test');
-        $builder->filterSql("priority > 5");
+        $builder->filterSql('priority > 5');
 
         $consumer = $builder->consumer();
 
-        $reflection = new \ReflectionClass($consumer);
+        $reflection = new ReflectionClass($consumer);
         $filterAmqpSqlProperty = $reflection->getProperty('filterAmqpSql');
         $filterAmqpSqlProperty->setAccessible(true);
         $filterJmsProperty = $reflection->getProperty('filterJms');
         $filterJmsProperty->setAccessible(true);
 
         // filterSql() should map to filterAmqpSql, not filterJms
-        $this->assertSame("priority > 5", $filterAmqpSqlProperty->getValue($consumer));
+        $this->assertSame('priority > 5', $filterAmqpSqlProperty->getValue($consumer));
         $this->assertNull($filterJmsProperty->getValue($consumer));
     }
 
@@ -669,16 +713,19 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
         // Queue 5 messages; with credit=4, replenish threshold is floor(4/2)=2
         for ($i = 0; $i < 5; $i++) {
             $mock->queueIncoming($this->makeTransferFrame(0, "msg-$i", deliveryId: $i));
         }
 
-        $count    = 0;
+        $count = 0;
         $consumer = new Consumer($client, '/queues/test', credit: 4);
         $consumer->run(function (Message $msg) use (&$count, $mock) {
             $count++;
@@ -710,9 +757,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'my-stable-link', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'my-stable-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 0.05, linkName: 'my-stable-link');
@@ -757,7 +807,7 @@ class ConsumerTest extends TestCase
 
         $consumer = new Consumer($client, '/queues/test', credit: 1);
 
-        $ref = new \ReflectionProperty(Consumer::class, 'stopRequested');
+        $ref = new ReflectionProperty(Consumer::class, 'stopRequested');
         $ref->setAccessible(true);
 
         $this->assertFalse($ref->getValue($consumer));
@@ -772,9 +822,12 @@ class ConsumerTest extends TestCase
         [$mock, $session, $client] = $this->makeClient();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'recv', handle: 0,
-            role:    PerformativeEncoder::ROLE_SENDER,
-            source:  '/queues/test', target: null,
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
         ));
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 5.0);
@@ -782,7 +835,7 @@ class ConsumerTest extends TestCase
         $consumer->receive(); // will idle-timeout (no messages) — but first we need attached state
 
         // Actually test stop: set attached state then call stop() before receive()
-        $refAttached = new \ReflectionProperty(Consumer::class, 'attached');
+        $refAttached = new ReflectionProperty(Consumer::class, 'attached');
         $refAttached->setAccessible(true);
         $refAttached->setValue($consumer, true);
 

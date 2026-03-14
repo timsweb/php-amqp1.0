@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Tests\Client;
@@ -18,7 +19,7 @@ class ConfigTest extends TestCase
 
     public function test_config_with_timeout(): void
     {
-        $config  = new Config();
+        $config = new Config();
         $updated = $config->with(timeout: 5.0);
         $this->assertSame(5.0, $updated->timeout);
         $this->assertSame(30.0, $config->timeout); // original unchanged
@@ -26,7 +27,7 @@ class ConfigTest extends TestCase
 
     public function test_config_with_tls_options(): void
     {
-        $config  = new Config();
+        $config = new Config();
         $updated = $config->with(tlsOptions: ['verify_peer' => false]);
         $this->assertSame(['verify_peer' => false], $updated->tlsOptions);
         $this->assertSame([], $config->tlsOptions); // original unchanged

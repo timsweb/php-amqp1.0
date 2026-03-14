@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Messaging;
 
 use AMQP10\Connection\ReceiverLink;
@@ -15,11 +17,12 @@ class DeliveryContextTest extends TestCase
         $sentState = null;
         $link = $this->createMock(ReceiverLink::class);
         $link->expects($this->once())
-             ->method('settle')
-             ->with(42, $this->callback(function (string $state) use (&$sentState) {
-                 $sentState = $state;
-                 return true;
-             }));
+            ->method('settle')
+            ->with(42, $this->callback(function (string $state) use (&$sentState) {
+                $sentState = $state;
+
+                return true;
+            }));
 
         $ctx = new DeliveryContext(42, $link);
         $ctx->modify(deliveryFailed: true, undeliverableHere: true);
@@ -36,11 +39,12 @@ class DeliveryContextTest extends TestCase
         $sentState = null;
         $link = $this->createMock(ReceiverLink::class);
         $link->expects($this->once())
-             ->method('settle')
-             ->with(1, $this->callback(function (string $state) use (&$sentState) {
-                 $sentState = $state;
-                 return true;
-             }));
+            ->method('settle')
+            ->with(1, $this->callback(function (string $state) use (&$sentState) {
+                $sentState = $state;
+
+                return true;
+            }));
 
         $ctx = new DeliveryContext(1, $link);
         $ctx->modify();
@@ -57,11 +61,12 @@ class DeliveryContextTest extends TestCase
         $sentState = null;
         $link = $this->createMock(ReceiverLink::class);
         $link->expects($this->once())
-             ->method('settle')
-             ->with(5, $this->callback(function (string $state) use (&$sentState) {
-                 $sentState = $state;
-                 return true;
-             }));
+            ->method('settle')
+            ->with(5, $this->callback(function (string $state) use (&$sentState) {
+                $sentState = $state;
+
+                return true;
+            }));
 
         $ctx = new DeliveryContext(5, $link);
         $ctx->modify(deliveryFailed: false, undeliverableHere: false);

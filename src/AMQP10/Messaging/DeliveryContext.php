@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Messaging;
@@ -9,7 +10,7 @@ use AMQP10\Protocol\PerformativeEncoder;
 class DeliveryContext
 {
     public function __construct(
-        private readonly int          $deliveryId,
+        private readonly int $deliveryId,
         private readonly ReceiverLink $link,
     ) {}
 

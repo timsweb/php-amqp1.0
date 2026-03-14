@@ -1,10 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Management;
 
 enum QueueType: string
 {
     case CLASSIC = 'classic';
-    case QUORUM  = 'quorum';
-    case STREAM  = 'stream';
+    case QUORUM = 'quorum';
+    case STREAM = 'stream';
 }

@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Connection;
 
 use AMQP10\Connection\Session;
@@ -10,6 +12,7 @@ use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeDecoder;
 use AMQP10\Tests\Mocks\TransportMock;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class SessionTest extends TestCase
 {
@@ -20,6 +23,7 @@ class SessionTest extends TestCase
         $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
         $session = new Session($mock, channel: 0);
         $session->begin();
+
         return [$mock, $session];
     }
 
@@ -76,14 +80,14 @@ class SessionTest extends TestCase
 
     public function test_begin_throws_when_transport_closes_before_response(): void
     {
-        $mock    = new TransportMock();
+        $mock = new TransportMock();
         $session = new Session($mock, channel: 0);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $session->begin();
     }
 
-    public function test_readFrameOfType_buffers_non_matching_frames(): void
+    public function test_read_frame_of_type_buffers_non_matching_frames(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
@@ -96,12 +100,12 @@ class SessionTest extends TestCase
 
         $frame = $session->nextFrame();
         $this->assertNotNull($frame);
-        $body        = FrameParser::extractBody($frame);
+        $body = FrameParser::extractBody($frame);
         $performative = (new TypeDecoder($body))->decode();
         $this->assertSame(Descriptor::OPEN, $performative['descriptor']);
     }
 
-    public function test_nextFrame_returns_null_when_no_more_data(): void
+    public function test_next_frame_returns_null_when_no_more_data(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
@@ -113,7 +117,7 @@ class SessionTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function test_readFrameOfType_uses_cached_descriptor(): void
+    public function test_read_frame_of_type_uses_cached_descriptor(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
@@ -124,13 +128,21 @@ class SessionTest extends TestCase
 
         // Queue multiple frames of different types
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'sender', handle: 0,
-            role: PerformativeEncoder::ROLE_RECEIVER, source: null, target: '/q/test',
+            channel: 0,
+            name: 'sender',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            source: null,
+            target: '/q/test',
         ));
         $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 1));
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'receiver', handle: 1,
-            role: PerformativeEncoder::ROLE_SENDER, source: '/q/test2', target: null,
+            channel: 0,
+            name: 'receiver',
+            handle: 1,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/q/test2',
+            target: null,
         ));
 
         // Read a specific frame type - should use cached descriptor
@@ -150,7 +162,7 @@ class SessionTest extends TestCase
         $this->assertSame(Descriptor::ATTACH, $performative['descriptor']);
     }
 
-    public function test_pendingFrames_handles_null_descriptor(): void
+    public function test_pending_frames_handles_null_descriptor(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
@@ -168,19 +180,19 @@ class SessionTest extends TestCase
         $this->assertNotNull($frame);
     }
 
-    public function test_readFrameOfType_throws_on_timeout(): void
+    public function test_read_frame_of_type_throws_on_timeout(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
         $mock->setEmptyReadMode(true);
         $session = new Session($mock, channel: 0, timeout: 0.05);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Timeout');
         $session->readFrameOfType(Descriptor::BEGIN);
     }
 
-    public function test_readFrameOfType_timeout_logic_exists(): void
+    public function test_read_frame_of_type_timeout_logic_exists(): void
     {
         $mock = new TransportMock();
         $mock->connect('amqp://test');
@@ -190,8 +202,12 @@ class SessionTest extends TestCase
         $mock->clearSent();
 
         $mock->queueIncoming(PerformativeEncoder::attach(
-            channel: 0, name: 'test-link', handle: 0,
-            role: PerformativeEncoder::ROLE_SENDER, source: null, target: '/q/test',
+            channel: 0,
+            name: 'test-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: null,
+            target: '/q/test',
         ));
 
         $frame = $session->readFrameOfType(Descriptor::ATTACH);

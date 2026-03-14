@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Messaging;
 
 use AMQP10\Connection\SenderLink;
@@ -17,31 +19,32 @@ class Publisher
 
     public function __construct(
         private readonly Session $session,
-        string                  $address,
-        private readonly float   $timeout    = 30.0,
-        bool                    $preSettled  = false,
-        int                     $maxFrameSize = 65536,
+        string $address,
+        private readonly float $timeout = 30.0,
+        bool $preSettled = false,
+        int $maxFrameSize = 65536,
     ) {
-        $linkName   = 'sender-' . bin2hex(random_bytes(4));
+        $linkName = 'sender-' . bin2hex(random_bytes(4));
         $this->link = new SenderLink(
             $session,
-            name:          $linkName,
-            target:        $address,
+            name: $linkName,
+            target: $address,
             sndSettleMode: $preSettled
                 ? PerformativeEncoder::SND_SETTLED
                 : PerformativeEncoder::SND_UNSETTLED,
-            maxFrameSize:  $maxFrameSize,
+            maxFrameSize: $maxFrameSize,
         );
         $this->link->attach();
     }
 
     public function send(Message $message): Outcome
     {
-        $payload    = MessageEncoder::encode($message);
+        $payload = MessageEncoder::encode($message);
         $deliveryId = $this->link->transfer($payload);
         if ($this->link->isPreSettled()) {
             return Outcome::accepted();
         }
+
         return $this->awaitOutcome($deliveryId);
     }
 
@@ -61,16 +64,17 @@ class Publisher
             }
             $frame = $this->session->nextFrame();
             if ($frame === null) {
-                if (!$this->session->transport()->isConnected()) {
+                if (! $this->session->transport()->isConnected()) {
                     throw new PublishException('Connection closed while awaiting outcome');
                 }
+
                 continue;
             }
 
-            $body         = FrameParser::extractBody($frame);
+            $body = FrameParser::extractBody($frame);
             $performative = (new TypeDecoder($body))->decode();
 
-            if (!is_array($performative)) {
+            if (! is_array($performative)) {
                 continue;
             }
             if (($performative['descriptor'] ?? null) !== Descriptor::DISPOSITION) {
@@ -78,27 +82,29 @@ class Publisher
             }
 
             $fields = $performative['value'];
-            $first  = $fields[1] ?? null;
+            $first = $fields[1] ?? null;
             if ($first !== $deliveryId) {
                 continue;
             }
 
             $state = $fields[4] ?? null;
+
             return $this->decodeOutcome($state);
         }
     }
 
     private function decodeOutcome(mixed $state): Outcome
     {
-        if (!is_array($state)) {
+        if (! is_array($state)) {
             return Outcome::accepted();
         }
+
         return match ($state['descriptor'] ?? null) {
             Descriptor::ACCEPTED => Outcome::accepted(),
             Descriptor::REJECTED => Outcome::rejected(),
             Descriptor::RELEASED => Outcome::released(),
             Descriptor::MODIFIED => Outcome::modified(),
-            default              => Outcome::released(),
+            default => Outcome::released(),
         };
     }
 }

@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Unit\Messaging;
 
 use AMQP10\Messaging\Message;
@@ -17,7 +19,7 @@ class MessageEncoderTest extends TestCase
      */
     private function decodeSections(string $encoded): array
     {
-        $decoder  = new TypeDecoder($encoded);
+        $decoder = new TypeDecoder($encoded);
         $sections = [];
         while ($decoder->remaining() > 0) {
             $section = $decoder->decode();
@@ -25,6 +27,7 @@ class MessageEncoderTest extends TestCase
                 $sections[] = $section;
             }
         }
+
         return $sections;
     }
 
@@ -36,6 +39,7 @@ class MessageEncoderTest extends TestCase
                 return $section;
             }
         }
+
         return null;
     }
 
@@ -44,8 +48,8 @@ class MessageEncoderTest extends TestCase
         // Message::create defaults durable=true, priority=4, ttl=0.
         // The encoder must emit a header section whenever durable=true,
         // since the AMQP 1.0 wire default for durable is false.
-        $m        = Message::create('test');
-        $encoded  = MessageEncoder::encode($m);
+        $m = Message::create('test');
+        $encoded = MessageEncoder::encode($m);
         $sections = $this->decodeSections($encoded);
 
         $header = $this->findSection($sections, Descriptor::MSG_HEADER);
@@ -57,8 +61,8 @@ class MessageEncoderTest extends TestCase
     public function test_durable_false_emits_no_header_with_default_priority_and_no_ttl(): void
     {
         // When durable=false, priority=4 (default), and ttl=0, no header section is needed.
-        $m        = Message::create('test')->withDurable(false);
-        $encoded  = MessageEncoder::encode($m);
+        $m = Message::create('test')->withDurable(false);
+        $encoded = MessageEncoder::encode($m);
         $sections = $this->decodeSections($encoded);
 
         $header = $this->findSection($sections, Descriptor::MSG_HEADER);
@@ -67,8 +71,8 @@ class MessageEncoderTest extends TestCase
 
     public function test_durable_false_when_set_with_non_default_priority(): void
     {
-        $m        = Message::create('test')->withDurable(false)->withPriority(8);
-        $encoded  = MessageEncoder::encode($m);
+        $m = Message::create('test')->withDurable(false)->withPriority(8);
+        $encoded = MessageEncoder::encode($m);
         $sections = $this->decodeSections($encoded);
 
         $header = $this->findSection($sections, Descriptor::MSG_HEADER);
@@ -80,8 +84,8 @@ class MessageEncoderTest extends TestCase
     {
         // Subject set via withSubject() — no other properties.
         // The encoder must emit a MSG_PROPERTIES section even when the $props array is empty.
-        $m        = Message::create('test')->withSubject('order.placed');
-        $encoded  = MessageEncoder::encode($m);
+        $m = Message::create('test')->withSubject('order.placed');
+        $encoded = MessageEncoder::encode($m);
         $sections = $this->decodeSections($encoded);
 
         $props = $this->findSection($sections, Descriptor::MSG_PROPERTIES);

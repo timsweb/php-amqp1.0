@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Messaging;
@@ -10,7 +11,7 @@ class Offset
 {
     private function __construct(
         public readonly string $type,
-        public readonly mixed  $value = null,
+        public readonly mixed $value = null,
     ) {}
 
     public static function first(): self

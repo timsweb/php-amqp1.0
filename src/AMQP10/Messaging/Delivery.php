@@ -1,11 +1,13 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Messaging;
 
 readonly class Delivery
 {
     public function __construct(
-        private Message         $message,
+        private Message $message,
         private DeliveryContext $context,
     ) {}
 

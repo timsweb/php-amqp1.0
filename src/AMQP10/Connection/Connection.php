@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Connection;
 
 use AMQP10\Exception\AuthenticationException;
@@ -15,8 +17,11 @@ use AMQP10\Transport\TransportInterface;
 class Connection
 {
     private bool $open = false;
-    private int  $negotiatedMaxFrameSize  = 65536;
-    private int  $negotiatedIdleTimeout   = 60000;
+
+    private int $negotiatedMaxFrameSize = 65536;
+
+    private int $negotiatedIdleTimeout = 60000;
+
     private readonly string $containerId;
 
     /**
@@ -78,8 +83,8 @@ class Connection
     private static function resolveVhost(string $uri): string
     {
         $parts = parse_url($uri);
-        $host  = $parts['host'] ?? 'localhost';
-        $path  = isset($parts['path']) ? urldecode(ltrim($parts['path'], '/')) : '';
+        $host = $parts['host'] ?? 'localhost';
+        $path = isset($parts['path']) ? urldecode(ltrim($parts['path'], '/')) : '';
 
         return $path !== '' ? $path : $host;
     }
@@ -96,7 +101,7 @@ class Connection
         );
 
         $outcomeFrame = $this->readNextFrame();
-        $body         = FrameParser::extractBody($outcomeFrame);
+        $body = FrameParser::extractBody($outcomeFrame);
         $performative = (new TypeDecoder($body))->decode();
 
         if ($performative['descriptor'] !== Descriptor::SASL_OUTCOME) {
@@ -116,12 +121,12 @@ class Connection
 
         $this->transport->send(PerformativeEncoder::open(
             containerId: $this->containerId,
-            hostname:    $hostname,
+            hostname: $hostname,
         ));
 
         $openFrame = $this->readNextFrame();
-        $body      = FrameParser::extractBody($openFrame);
-        $open      = (new TypeDecoder($body))->decode();
+        $body = FrameParser::extractBody($openFrame);
+        $open = (new TypeDecoder($body))->decode();
 
         if (isset($open['value'][2]) && $open['value'][2] > 0) {
             $this->negotiatedMaxFrameSize = min($this->negotiatedMaxFrameSize, $open['value'][2]);
@@ -137,7 +142,7 @@ class Connection
     private function expectProtocolHeader(string $expected): void
     {
         $this->fillBuffer(8);
-        $header       = substr($this->buffer, 0, 8);
+        $header = substr($this->buffer, 0, 8);
         $this->buffer = substr($this->buffer, 8);
 
         if ($header !== $expected) {
@@ -159,8 +164,9 @@ class Connection
 
         // Now read the full frame
         $this->fillBuffer($size);
-        $frame        = substr($this->buffer, 0, $size);
+        $frame = substr($this->buffer, 0, $size);
         $this->buffer = substr($this->buffer, $size);
+
         return $frame;
     }
 

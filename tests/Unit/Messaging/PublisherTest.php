@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Messaging;
 
 use AMQP10\Client\Client;
@@ -25,6 +27,7 @@ class PublisherTest extends TestCase
         $session = new Session($mock, channel: 0);
         $session->begin();
         $mock->clearSent();
+
         return [$mock, $session];
     }
 
@@ -34,22 +37,22 @@ class PublisherTest extends TestCase
 
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'sender-link',
-            handle:  0,
-            role:    PerformativeEncoder::ROLE_RECEIVER,
-            source:  null,
-            target:  '/queues/test',
+            name: 'sender-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            source: null,
+            target: '/queues/test',
         ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
-            channel:  0,
-            role:     PerformativeEncoder::ROLE_RECEIVER,
-            first:    0,
-            settled:  true,
-            state:    PerformativeEncoder::accepted(),
+            channel: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            first: 0,
+            settled: true,
+            state: PerformativeEncoder::accepted(),
         ));
 
         $publisher = new Publisher($session, '/queues/test');
-        $outcome   = $publisher->send(new Message('hello'));
+        $outcome = $publisher->send(new Message('hello'));
 
         // Verify a TRANSFER frame was sent (among ATTACH + TRANSFER frames)
         $parser = new FrameParser();
@@ -74,22 +77,22 @@ class PublisherTest extends TestCase
 
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'sender-link',
-            handle:  0,
-            role:    PerformativeEncoder::ROLE_RECEIVER,
-            source:  null,
-            target:  '/queues/test',
+            name: 'sender-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            source: null,
+            target: '/queues/test',
         ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
-            channel:  0,
-            role:     PerformativeEncoder::ROLE_RECEIVER,
-            first:    0,
-            settled:  true,
-            state:    PerformativeEncoder::rejected(),
+            channel: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            first: 0,
+            settled: true,
+            state: PerformativeEncoder::rejected(),
         ));
 
         $publisher = new Publisher($session, '/queues/test');
-        $outcome   = $publisher->send(new Message('hello'));
+        $outcome = $publisher->send(new Message('hello'));
 
         $this->assertTrue($outcome->isRejected());
     }
@@ -100,18 +103,18 @@ class PublisherTest extends TestCase
 
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'sender-link',
-            handle:  0,
-            role:    PerformativeEncoder::ROLE_RECEIVER,
-            source:  null,
-            target:  '/queues/test',
+            name: 'sender-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            source: null,
+            target: '/queues/test',
         ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
-            channel:  0,
-            role:     PerformativeEncoder::ROLE_RECEIVER,
-            first:    0,
-            settled:  true,
-            state:    PerformativeEncoder::accepted(),
+            channel: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            first: 0,
+            settled: true,
+            state: PerformativeEncoder::accepted(),
         ));
 
         $publisher = new Publisher($session, '/queues/test');
@@ -134,18 +137,18 @@ class PublisherTest extends TestCase
 
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'sender-link',
-            handle:  0,
-            role:    PerformativeEncoder::ROLE_RECEIVER,
-            source:  null,
-            target:  '/queues/test',
+            name: 'sender-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            source: null,
+            target: '/queues/test',
         ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
-            channel:  0,
-            role:     PerformativeEncoder::ROLE_RECEIVER,
-            first:    0,
-            settled:  true,
-            state:    PerformativeEncoder::accepted(),
+            channel: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            first: 0,
+            settled: true,
+            state: PerformativeEncoder::accepted(),
         ));
 
         $client = $this->createMock(Client::class);
@@ -181,11 +184,11 @@ class PublisherTest extends TestCase
 
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'sender-link',
-            handle:  0,
-            role:    PerformativeEncoder::ROLE_RECEIVER,
-            source:  null,
-            target:  '/queues/test',
+            name: 'sender-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            source: null,
+            target: '/queues/test',
         ));
         // No DISPOSITION queued — will timeout
 
@@ -201,34 +204,34 @@ class PublisherTest extends TestCase
 
         $mock->queueIncoming(PerformativeEncoder::attach(
             channel: 0,
-            name:    'sender-link',
-            handle:  0,
-            role:    PerformativeEncoder::ROLE_RECEIVER,
-            source:  null,
-            target:  '/queues/test',
+            name: 'sender-link',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            source: null,
+            target: '/queues/test',
         ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
-            channel:  0,
-            role:     PerformativeEncoder::ROLE_RECEIVER,
-            first:    0,
-            settled:  true,
-            state:    PerformativeEncoder::accepted(),
+            channel: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            first: 0,
+            settled: true,
+            state: PerformativeEncoder::accepted(),
         ));
         $mock->queueIncoming(PerformativeEncoder::disposition(
-            channel:  0,
-            role:     PerformativeEncoder::ROLE_RECEIVER,
-            first:    1,
-            settled:  true,
-            state:    PerformativeEncoder::accepted(),
+            channel: 0,
+            role: PerformativeEncoder::ROLE_RECEIVER,
+            first: 1,
+            settled: true,
+            state: PerformativeEncoder::accepted(),
         ));
 
         $client = $this->createMock(Client::class);
         $client->method('session')->willReturn($session);
 
-        $builder   = new PublisherBuilder($client, '/queues/test');
+        $builder = new PublisherBuilder($client, '/queues/test');
         $publisher = $builder->publisher();
-        $outcome1  = $publisher->send(new Message('first'));
-        $outcome2  = $publisher->send(new Message('second'));
+        $outcome1 = $publisher->send(new Message('first'));
+        $outcome2 = $publisher->send(new Message('second'));
         $publisher->close();
 
         $this->assertTrue($outcome1->isAccepted());

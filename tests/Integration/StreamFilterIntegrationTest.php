@@ -1,13 +1,16 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Tests\Integration;
 
 use AMQP10\Address\AddressHelper;
+use AMQP10\Exception\ManagementException;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\Offset;
+use Throwable;
 
 class StreamFilterIntegrationTest extends RabbitMqTestCase
 {
@@ -29,7 +32,10 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
         $this->runInEventLoop(function (): void {
             $client = $this->newClient()->connect();
             $mgmt = $client->management();
-            try { $mgmt->deleteQueue($this->queueName); } catch (\Throwable) {}
+            try {
+                $mgmt->deleteQueue($this->queueName);
+            } catch (Throwable) {
+            }
             $mgmt->close();
             $client->close();
         });
@@ -39,7 +45,7 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
     {
         $received = [];
         $this->runInEventLoop(function () use (&$received): void {
-            $client  = $this->newClient()->connect();
+            $client = $this->newClient()->connect();
             $address = AddressHelper::queueAddress($this->queueName);
 
             $client->publish($address)->send(new Message('msg-1'));
@@ -66,21 +72,25 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
 
     public function test_consume_from_stream_with_offset(): void
     {
-        $skipped  = false;
+        $skipped = false;
         $received = [];
 
         $this->runInEventLoop(function () use (&$skipped, &$received): void {
-            $client    = $this->newClient()->connect();
-            $mgmt      = $client->management();
+            $client = $this->newClient()->connect();
+            $mgmt = $client->management();
             $queueName = $this->queueName . '-offset';
 
             try {
-                try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+                try {
+                    $mgmt->deleteQueue($queueName);
+                } catch (Throwable) {
+                }
                 $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::STREAM));
-            } catch (\AMQP10\Exception\ManagementException $e) {
+            } catch (ManagementException $e) {
                 $mgmt->close();
                 $client->close();
                 $skipped = true;
+
                 return;
             }
             $mgmt->close();
@@ -120,23 +130,27 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
         $this->assertEquals(['msg-6', 'msg-7', 'msg-8', 'msg-9', 'msg-10'], $received);
     }
 
-    public function test_consume_from_stream_with_filterAmqpSql(): void
+    public function test_consume_from_stream_with_filter_amqp_sql(): void
     {
-        $skipped  = false;
+        $skipped = false;
         $received = [];
 
         $this->runInEventLoop(function () use (&$skipped, &$received): void {
-            $client    = $this->newClient()->connect();
-            $mgmt      = $client->management();
+            $client = $this->newClient()->connect();
+            $mgmt = $client->management();
             $queueName = $this->queueName . '-filter-amqp';
 
             try {
-                try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+                try {
+                    $mgmt->deleteQueue($queueName);
+                } catch (Throwable) {
+                }
                 $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::STREAM));
-            } catch (\AMQP10\Exception\ManagementException $e) {
+            } catch (ManagementException $e) {
                 $mgmt->close();
                 $client->close();
                 $skipped = true;
+
                 return;
             }
             $mgmt->close();
@@ -186,23 +200,27 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
         $this->assertNotContains('msg-5', $received);
     }
 
-    public function test_consume_from_stream_with_filterBloom(): void
+    public function test_consume_from_stream_with_filter_bloom(): void
     {
-        $skipped  = false;
+        $skipped = false;
         $received = [];
 
         $this->runInEventLoop(function () use (&$skipped, &$received): void {
-            $client    = $this->newClient()->connect();
-            $mgmt      = $client->management();
+            $client = $this->newClient()->connect();
+            $mgmt = $client->management();
             $queueName = $this->queueName . '-filter-bloom';
 
             try {
-                try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+                try {
+                    $mgmt->deleteQueue($queueName);
+                } catch (Throwable) {
+                }
                 $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::STREAM));
-            } catch (\AMQP10\Exception\ManagementException $e) {
+            } catch (ManagementException $e) {
                 $mgmt->close();
                 $client->close();
                 $skipped = true;
+
                 return;
             }
             $mgmt->close();
@@ -255,21 +273,25 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
 
     public function test_consume_from_stream_with_combined_filters(): void
     {
-        $skipped  = false;
+        $skipped = false;
         $received = [];
 
         $this->runInEventLoop(function () use (&$skipped, &$received): void {
-            $client    = $this->newClient()->connect();
-            $mgmt      = $client->management();
+            $client = $this->newClient()->connect();
+            $mgmt = $client->management();
             $queueName = $this->queueName . '-combined';
 
             try {
-                try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+                try {
+                    $mgmt->deleteQueue($queueName);
+                } catch (Throwable) {
+                }
                 $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::STREAM));
-            } catch (\AMQP10\Exception\ManagementException $e) {
+            } catch (ManagementException $e) {
                 $mgmt->close();
                 $client->close();
                 $skipped = true;
+
                 return;
             }
             $mgmt->close();
@@ -279,23 +301,23 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
             // Publish messages with different filters and priorities
             for ($i = 1; $i <= 20; $i++) {
                 $filterValue = 'other';
-                $subject     = 'normal';
+                $subject = 'normal';
 
                 if ($i % 5 === 1) {
                     $filterValue = 'high-priority';
-                    $subject     = 'urgent';
+                    $subject = 'urgent';
                 } elseif ($i % 5 === 2) {
                     $filterValue = 'high-priority';
-                    $subject     = 'normal';
+                    $subject = 'normal';
                 } elseif ($i % 5 === 3) {
                     $filterValue = 'other';
-                    $subject     = 'urgent';
+                    $subject = 'urgent';
                 }
 
                 $msg = new Message(
                     "msg-{$i}",
                     annotations: ['x-stream-filter-value' => $filterValue],
-                    properties:  ['subject' => $subject]
+                    properties: ['subject' => $subject]
                 );
                 $client->publish($address)->send($msg);
             }
@@ -336,21 +358,25 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
 
     public function test_consume_from_stream_edge_cases(): void
     {
-        $skipped  = false;
+        $skipped = false;
         $received = [];
 
         $this->runInEventLoop(function () use (&$skipped, &$received): void {
-            $client    = $this->newClient()->connect();
-            $mgmt      = $client->management();
+            $client = $this->newClient()->connect();
+            $mgmt = $client->management();
             $queueName = $this->queueName . '-edge';
 
             try {
-                try { $mgmt->deleteQueue($queueName); } catch (\Throwable) {}
+                try {
+                    $mgmt->deleteQueue($queueName);
+                } catch (Throwable) {
+                }
                 $mgmt->declareQueue(new QueueSpecification($queueName, QueueType::STREAM));
-            } catch (\AMQP10\Exception\ManagementException $e) {
+            } catch (ManagementException $e) {
                 $mgmt->close();
                 $client->close();
                 $skipped = true;
+
                 return;
             }
             $mgmt->close();

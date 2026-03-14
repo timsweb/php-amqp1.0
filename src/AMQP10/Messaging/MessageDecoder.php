@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Messaging;
 
 use AMQP10\Protocol\Descriptor;
@@ -13,14 +15,14 @@ class MessageDecoder
     public static function decode(string $payload): Message
     {
         $decoder = new TypeDecoder($payload);
-        $body    = '';
-        $props   = [];
+        $body = '';
+        $props = [];
         $appProps = [];
         $annotations = [];
 
         while ($decoder->remaining() > 0) {
             $section = $decoder->decode(); // each section is a described type
-            if (!is_array($section) || !isset($section['descriptor'])) {
+            if (! is_array($section) || ! isset($section['descriptor'])) {
                 continue;
             }
 
@@ -37,7 +39,7 @@ class MessageDecoder
     }
 
     /**
-     * @param array<int, mixed> $fields
+     * @param  array<int, mixed>  $fields
      * @return array<string, mixed>
      */
     private static function extractProperties(array $fields): array
@@ -59,6 +61,7 @@ class MessageDecoder
                 $map[$name] = $fields[$index];
             }
         }
+
         return $map;
     }
 }

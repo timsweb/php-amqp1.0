@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Connection;
 
 use AMQP10\Connection\Connection;
@@ -12,6 +14,7 @@ class VirtualHostTest extends TestCase
     {
         $method = new ReflectionMethod(Connection::class, 'resolveVhost');
         $method->setAccessible(true);
+
         return $method->invoke(null, $uri);
     }
 

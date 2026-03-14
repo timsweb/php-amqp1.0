@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -42,7 +43,8 @@ function benchmarkPipelinedReads(int $frameCount, int $iterations = 5): float
     }
 
     sort($times);
-    $medianIndex = (int)(count($times) / 2);
+    $medianIndex = (int) (count($times) / 2);
+
     return $times[$medianIndex];
 }
 

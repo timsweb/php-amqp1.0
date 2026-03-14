@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace AMQP10\Tests\Client;
@@ -18,7 +19,7 @@ class ClientTest extends TestCase
 
     public function test_with_sasl_returns_new_instance(): void
     {
-        $client  = new Client('amqp://guest:guest@localhost:5672/');
+        $client = new Client('amqp://guest:guest@localhost:5672/');
         $client2 = $client->withSasl(Sasl::plain('u', 'p'));
         $this->assertNotSame($client, $client2);
         $this->assertNull($client->config()->sasl);
@@ -33,7 +34,7 @@ class ClientTest extends TestCase
 
     public function test_config_with_timeout(): void
     {
-        $config  = new Config();
+        $config = new Config();
         $updated = $config->with(timeout: 5.0);
         $this->assertSame(5.0, $updated->timeout);
         $this->assertSame(30.0, $config->timeout); // original unchanged
@@ -41,7 +42,7 @@ class ClientTest extends TestCase
 
     public function test_with_timeout_fluent_method(): void
     {
-        $client  = new Client('amqp://localhost/');
+        $client = new Client('amqp://localhost/');
         $client2 = $client->withTimeout(10.0);
 
         $this->assertNotSame($client, $client2);
@@ -51,7 +52,7 @@ class ClientTest extends TestCase
 
     public function test_with_tls_options_returns_new_instance(): void
     {
-        $client  = new Client('amqps://localhost/');
+        $client = new Client('amqps://localhost/');
         $client2 = $client->withTlsOptions(['verify_peer' => false]);
 
         $this->assertNotSame($client, $client2);

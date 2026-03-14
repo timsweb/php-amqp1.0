@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Protocol;
 
 use AMQP10\Protocol\FrameBuilder;
@@ -10,9 +12,9 @@ class FrameBuilderTest extends TestCase
     private function assertValidFrameHeader(string $frame): void
     {
         $this->assertGreaterThanOrEqual(8, strlen($frame), 'Frame must be at least 8 bytes');
-        $size    = unpack('N', substr($frame, 0, 4))[1];
-        $doff    = ord($frame[4]);
-        $type    = ord($frame[5]);
+        $size = unpack('N', substr($frame, 0, 4))[1];
+        $doff = ord($frame[4]);
+        $type = ord($frame[5]);
         $channel = unpack('n', substr($frame, 6, 2))[1];
         $this->assertSame(strlen($frame), $size, 'SIZE field must equal total frame length');
         $this->assertGreaterThanOrEqual(2, $doff, 'DOFF must be >= 2 (8-byte minimum header)');
@@ -38,7 +40,7 @@ class FrameBuilderTest extends TestCase
 
     public function test_amqp_frame_with_body(): void
     {
-        $body  = "\x00\x53\x10\x45";
+        $body = "\x00\x53\x10\x45";
         $frame = FrameBuilder::amqp(channel: 0, body: $body);
         $this->assertValidFrameHeader($frame);
         $this->assertSame(0x00, ord($frame[5]), 'TYPE must be 0x00 for AMQP frame');
@@ -48,22 +50,22 @@ class FrameBuilderTest extends TestCase
 
     public function test_amqp_frame_channel_is_encoded(): void
     {
-        $frame   = FrameBuilder::amqp(channel: 3, body: '');
+        $frame = FrameBuilder::amqp(channel: 3, body: '');
         $channel = unpack('n', substr($frame, 6, 2))[1];
         $this->assertSame(3, $channel);
     }
 
     public function test_amqp_frame_size_reflects_body_length(): void
     {
-        $body  = str_repeat("\x40", 100);
+        $body = str_repeat("\x40", 100);
         $frame = FrameBuilder::amqp(channel: 0, body: $body);
-        $size  = unpack('N', substr($frame, 0, 4))[1];
+        $size = unpack('N', substr($frame, 0, 4))[1];
         $this->assertSame(108, $size); // 8 header + 100 body
     }
 
     public function test_sasl_frame_type_is_0x01(): void
     {
-        $body  = "\x00\x53\x40\x45";
+        $body = "\x00\x53\x40\x45";
         $frame = FrameBuilder::sasl(body: $body);
         $this->assertValidFrameHeader($frame);
         $this->assertSame(0x01, ord($frame[5]), 'TYPE must be 0x01 for SASL frame');

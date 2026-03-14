@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Protocol;
 
 /**
@@ -15,7 +17,9 @@ namespace AMQP10\Protocol;
 class FrameBuilder
 {
     private const DOFF = 2;
+
     private const TYPE_AMQP = 0x00;
+
     private const TYPE_SASL = 0x01;
 
     /** An empty AMQP frame with no body — used as a heartbeat. */
@@ -35,22 +39,26 @@ class FrameBuilder
 
     /**
      * Build an AMQP performative frame (TYPE=0x00).
-     * @param int    $channel Session channel number (0 for connection-level)
-     * @param string $body    Pre-encoded performative body
+     *
+     * @param  int  $channel  Session channel number (0 for connection-level)
+     * @param  string  $body  Pre-encoded performative body
      */
     public static function amqp(int $channel, string $body): string
     {
         $size = 8 + strlen($body);
+
         return self::buildHeader(size: $size, type: self::TYPE_AMQP, channel: $channel) . $body;
     }
 
     /**
      * Build a SASL frame (TYPE=0x01). Channel bytes are present but ignored.
-     * @param string $body Pre-encoded SASL performative body
+     *
+     * @param  string  $body  Pre-encoded SASL performative body
      */
     public static function sasl(string $body): string
     {
         $size = 8 + strlen($body);
+
         return self::buildHeader(size: $size, type: self::TYPE_SASL, channel: 0) . $body;
     }
 

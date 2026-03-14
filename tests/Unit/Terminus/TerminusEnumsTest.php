@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Unit\Terminus;
 
 use AMQP10\Terminus\ExpiryPolicy;
@@ -17,9 +19,9 @@ class TerminusEnumsTest extends TestCase
 
     public function test_expiry_policy_values(): void
     {
-        $this->assertSame('link-detach',      ExpiryPolicy::LinkDetach->value);
-        $this->assertSame('session-end',      ExpiryPolicy::SessionEnd->value);
+        $this->assertSame('link-detach', ExpiryPolicy::LinkDetach->value);
+        $this->assertSame('session-end', ExpiryPolicy::SessionEnd->value);
         $this->assertSame('connection-close', ExpiryPolicy::ConnectionClose->value);
-        $this->assertSame('never',            ExpiryPolicy::Never->value);
+        $this->assertSame('never', ExpiryPolicy::Never->value);
     }
 }

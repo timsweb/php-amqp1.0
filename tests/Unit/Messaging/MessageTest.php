@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Unit\Messaging;
 
 use AMQP10\Messaging\Message;

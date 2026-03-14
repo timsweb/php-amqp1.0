@@ -1,15 +1,20 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Tests\Mocks;
 
 use AMQP10\Transport\TransportInterface;
 
 class TransportMock implements TransportInterface
 {
-    private bool   $connected      = false;
-    private string $incoming       = '';
-    private string $outgoing       = '';
-    private bool   $emptyReadMode  = false;
+    private bool $connected = false;
+
+    private string $incoming = '';
+
+    private string $outgoing = '';
+
+    private bool $emptyReadMode = false;
 
     public function connect(string $uri): void
     {
@@ -36,11 +41,12 @@ class TransportMock implements TransportInterface
         if ($this->emptyReadMode) {
             return '';
         }
-        if (!$this->connected || $this->incoming === '') {
+        if (! $this->connected || $this->incoming === '') {
             return '';
         }
-        $chunk          = substr($this->incoming, 0, $length);
+        $chunk = substr($this->incoming, 0, $length);
         $this->incoming = substr($this->incoming, $length);
+
         return $chunk;
     }
 

@@ -1,0 +1,33 @@
+{
+    "preset": "per",
+    "rules": {
+        "concat_space": {
+            "spacing": "one"
+        },
+        "single_space_around_construct": true,
+        "trailing_comma_in_multiline": true,
+        "single_quote": true,
+        "no_extra_blank_lines": {
+            "tokens": [
+                "attribute",
+                "break",
+                "case",
+                "continue",
+                "curly_brace_block",
+                "default",
+                "extra",
+                "parenthesis_brace_block",
+                "return",
+                "square_brace_block",
+                "switch",
+                "throw",
+                "use",
+                "use_trait"
+            ]
+        },
+        "global_namespace_import": {
+            "import_classes": true,
+            "import_constants": true
+        }
+    }
+}

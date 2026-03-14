@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace AMQP10\Protocol;
 
 use AMQP10\Terminus\ExpiryPolicy;
@@ -12,22 +14,26 @@ use AMQP10\Terminus\TerminusDurability;
  */
 class PerformativeEncoder
 {
-    public const ROLE_SENDER   = false;
+    public const ROLE_SENDER = false;
+
     public const ROLE_RECEIVER = true;
 
     public const SND_UNSETTLED = 0;
-    public const SND_SETTLED   = 1;
-    public const SND_MIXED     = 2;
 
-    public const RCV_FIRST  = 0;
+    public const SND_SETTLED = 1;
+
+    public const SND_MIXED = 2;
+
+    public const RCV_FIRST = 0;
+
     public const RCV_SECOND = 1;
 
     public static function open(
-        string  $containerId,
-        ?string $hostname     = null,
-        int     $maxFrameSize = 65536,
-        int     $channelMax   = 65535,
-        int     $idleTimeOut  = 60000,
+        string $containerId,
+        ?string $hostname = null,
+        int $maxFrameSize = 65536,
+        int $channelMax = 65535,
+        int $idleTimeOut = 60000,
     ): string {
         $fields = [
             TypeEncoder::encodeString($containerId),
@@ -36,22 +42,24 @@ class PerformativeEncoder
             TypeEncoder::encodeUshort($channelMax),
             TypeEncoder::encodeUint($idleTimeOut),
         ];
+
         return FrameBuilder::amqp(channel: 0, body: self::described(Descriptor::OPEN, $fields));
     }
 
     public static function close(int $channel, ?string $errorDescription = null): string
     {
         $fields = $errorDescription !== null ? [TypeEncoder::encodeString($errorDescription)] : [];
+
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::CLOSE, $fields));
     }
 
     public static function begin(
-        int  $channel,
-        int  $nextOutgoingId  = 0,
-        int  $incomingWindow  = 2048,
-        int  $outgoingWindow  = 2048,
-        int  $handleMax       = 255,
-        ?int $remoteChannel   = null,
+        int $channel,
+        int $nextOutgoingId = 0,
+        int $incomingWindow = 2048,
+        int $outgoingWindow = 2048,
+        int $handleMax = 255,
+        ?int $remoteChannel = null,
     ): string {
         $fields = [
             $remoteChannel !== null ? TypeEncoder::encodeUshort($remoteChannel) : TypeEncoder::encodeNull(),
@@ -60,6 +68,7 @@ class PerformativeEncoder
             TypeEncoder::encodeUint($outgoingWindow),
             TypeEncoder::encodeUint($handleMax),
         ];
+
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::BEGIN, $fields));
     }
 
@@ -69,22 +78,22 @@ class PerformativeEncoder
     }
 
     /**
-     * @param array<mixed, mixed>|null $properties
+     * @param  array<mixed, mixed>|null  $properties
      */
     public static function attach(
-        int                  $channel,
-        string               $name,
-        int                  $handle,
-        bool                 $role,
-        ?string              $source                  = null,
-        ?string              $target                  = null,
-        int                  $sndSettleMode           = self::SND_UNSETTLED,
-        int                  $rcvSettleMode           = self::RCV_FIRST,
-        ?array               $properties              = null,
-        ?int                 $initialDeliveryCount    = null,
-        ?string              $filterMap               = null,
-        ?TerminusDurability  $durable                 = null,
-        ?ExpiryPolicy        $expiryPolicy            = null,
+        int $channel,
+        string $name,
+        int $handle,
+        bool $role,
+        ?string $source = null,
+        ?string $target = null,
+        int $sndSettleMode = self::SND_UNSETTLED,
+        int $rcvSettleMode = self::RCV_FIRST,
+        ?array $properties = null,
+        ?int $initialDeliveryCount = null,
+        ?string $filterMap = null,
+        ?TerminusDurability $durable = null,
+        ?ExpiryPolicy $expiryPolicy = null,
     ): string {
         $fields = [
             TypeEncoder::encodeString($name),
@@ -106,6 +115,7 @@ class PerformativeEncoder
                 ? TypeEncoder::encodeMap($properties)
                 : TypeEncoder::encodeNull(),
         ];
+
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::ATTACH, $fields));
     }
 
@@ -115,6 +125,7 @@ class PerformativeEncoder
             TypeEncoder::encodeUint($handle),
             TypeEncoder::encodeBool($closed),
         ];
+
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::DETACH, $fields));
     }
 
@@ -137,18 +148,19 @@ class PerformativeEncoder
             TypeEncoder::encodeUint($deliveryCount),
             TypeEncoder::encodeUint($linkCredit),
         ];
+
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::FLOW, $fields));
     }
 
     public static function transfer(
-        int     $channel,
-        int     $handle,
-        ?int    $deliveryId,
+        int $channel,
+        int $handle,
+        ?int $deliveryId,
         ?string $deliveryTag,
-        string  $messagePayload,
-        bool    $settled       = false,
-        int     $messageFormat = 0,
-        bool    $more          = false,
+        string $messagePayload,
+        bool $settled = false,
+        int $messageFormat = 0,
+        bool $more = false,
     ): string {
         $fields = [
             TypeEncoder::encodeUint($handle),
@@ -159,16 +171,17 @@ class PerformativeEncoder
             TypeEncoder::encodeBool($more),
         ];
         $body = self::described(Descriptor::TRANSFER, $fields) . $messagePayload;
+
         return FrameBuilder::amqp(channel: $channel, body: $body);
     }
 
     public static function disposition(
-        int    $channel,
-        bool   $role,
-        int    $first,
-        ?int   $last    = null,
-        bool   $settled = true,
-        string $state   = '',
+        int $channel,
+        bool $role,
+        int $first,
+        ?int $last = null,
+        bool $settled = true,
+        string $state = '',
     ): string {
         $fields = [
             TypeEncoder::encodeBool($role),
@@ -177,6 +190,7 @@ class PerformativeEncoder
             TypeEncoder::encodeBool($settled),
             $state !== '' ? $state : TypeEncoder::encodeNull(),
         ];
+
         return FrameBuilder::amqp(channel: $channel, body: self::described(Descriptor::DISPOSITION, $fields));
     }
 
@@ -201,15 +215,17 @@ class PerformativeEncoder
             TypeEncoder::encodeBool($deliveryFailed),
             TypeEncoder::encodeBool($undeliverableHere),
         ];
+
         return self::described(Descriptor::MODIFIED, $fields);
     }
 
     /**
-     * @param array<int, string> $mechanisms
+     * @param  array<int, string>  $mechanisms
      */
     public static function saslMechanisms(array $mechanisms): string
     {
         $fields = [TypeEncoder::encodeSymbolArray($mechanisms)];
+
         return FrameBuilder::sasl(body: self::described(Descriptor::SASL_MECHANISMS, $fields));
     }
 
@@ -220,17 +236,19 @@ class PerformativeEncoder
             TypeEncoder::encodeBinary($initialResponse),
             $hostname !== null ? TypeEncoder::encodeString($hostname) : TypeEncoder::encodeNull(),
         ];
+
         return FrameBuilder::sasl(body: self::described(Descriptor::SASL_INIT, $fields));
     }
 
     public static function saslOutcome(int $code): string
     {
         $fields = [TypeEncoder::encodeUbyte($code)];
+
         return FrameBuilder::sasl(body: self::described(Descriptor::SASL_OUTCOME, $fields));
     }
 
     /**
-     * @param array<int, string> $fields
+     * @param  array<int, string>  $fields
      */
     private static function described(int $descriptor, array $fields): string
     {
@@ -241,16 +259,16 @@ class PerformativeEncoder
     }
 
     private static function encodeSource(
-        ?string             $address,
-        ?string             $filterMap    = null,
-        ?TerminusDurability $durable      = null,
-        ?ExpiryPolicy       $expiryPolicy = null,
+        ?string $address,
+        ?string $filterMap = null,
+        ?TerminusDurability $durable = null,
+        ?ExpiryPolicy $expiryPolicy = null,
     ): string {
         if ($address === null) {
             return TypeEncoder::encodeNull();
         }
         $hasExtras = $filterMap !== null || $durable !== null || $expiryPolicy !== null;
-        if (!$hasExtras) {
+        if (! $hasExtras) {
             $fields = [TypeEncoder::encodeString($address)];
         } else {
             $fields = [
@@ -275,6 +293,7 @@ class PerformativeEncoder
                     : TypeEncoder::encodeNull(),
             ];
         }
+
         return TypeEncoder::encodeDescribed(
             TypeEncoder::encodeUlong(Descriptor::SOURCE), // source descriptor
             TypeEncoder::encodeList($fields),
@@ -287,6 +306,7 @@ class PerformativeEncoder
             return TypeEncoder::encodeNull();
         }
         $fields = [TypeEncoder::encodeString($address)];
+
         return TypeEncoder::encodeDescribed(
             TypeEncoder::encodeUlong(Descriptor::TARGET), // target descriptor
             TypeEncoder::encodeList($fields),
