@@ -42,26 +42,37 @@ class MessageEncoderTest extends TestCase
     public function test_durable_true_by_default(): void
     {
         // Message::create defaults durable=true, priority=4, ttl=0.
-        // The encoder only emits a header section when ttl>0 or priority!=4.
-        // We need to force a header by also setting a non-default priority so the header is emitted.
-        $m        = Message::create('test')->withPriority(8);
+        // The encoder must emit a header section whenever durable=true,
+        // since the AMQP 1.0 wire default for durable is false.
+        $m        = Message::create('test');
         $encoded  = MessageEncoder::encode($m);
         $sections = $this->decodeSections($encoded);
 
         $header = $this->findSection($sections, Descriptor::MSG_HEADER);
-        $this->assertNotNull($header, 'Header section must be present');
+        $this->assertNotNull($header, 'Header section must be present when durable=true');
         // field[0] = durable
         $this->assertTrue($header['value'][0], 'durable should be true');
     }
 
-    public function test_durable_false_when_set(): void
+    public function test_durable_false_emits_no_header_with_default_priority_and_no_ttl(): void
+    {
+        // When durable=false, priority=4 (default), and ttl=0, no header section is needed.
+        $m        = Message::create('test')->withDurable(false);
+        $encoded  = MessageEncoder::encode($m);
+        $sections = $this->decodeSections($encoded);
+
+        $header = $this->findSection($sections, Descriptor::MSG_HEADER);
+        $this->assertNull($header, 'Header section must be absent when all fields are wire defaults');
+    }
+
+    public function test_durable_false_when_set_with_non_default_priority(): void
     {
         $m        = Message::create('test')->withDurable(false)->withPriority(8);
         $encoded  = MessageEncoder::encode($m);
         $sections = $this->decodeSections($encoded);
 
         $header = $this->findSection($sections, Descriptor::MSG_HEADER);
-        $this->assertNotNull($header, 'Header section must be present');
+        $this->assertNotNull($header, 'Header section must be present when priority is non-default');
         $this->assertFalse($header['value'][0], 'durable should be false');
     }
 

@@ -159,7 +159,11 @@ class Consumer
                 }
                 $attempts++;
                 $backoff = $this->reconnectBackoffMs * $attempts;
-                usleep($backoff * 1000);
+                $suspension = \Revolt\EventLoop::getSuspension();
+                \Revolt\EventLoop::delay($backoff / 1000, static function () use ($suspension): void {
+                    $suspension->resume();
+                });
+                $suspension->suspend();
                 $this->attached = false;
                 $this->client->reconnect();
                 $this->reattach($this->client->session());

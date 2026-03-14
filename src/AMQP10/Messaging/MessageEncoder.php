@@ -21,8 +21,8 @@ class MessageEncoder
     {
         $sections = '';
 
-        // Header section (if TTL, priority, or durable differs from default)
-        if ($message->ttl() > 0 || $message->priority() !== 4 || !$message->durable()) {
+        // Header section (if durable, TTL, or priority differs from wire defaults)
+        if ($message->durable() || $message->ttl() > 0 || $message->priority() !== 4) {
             $sections .= self::section(Descriptor::MSG_HEADER, [
                 TypeEncoder::encodeBool($message->durable()),  // durable
                 TypeEncoder::encodeUbyte($message->priority()), // priority

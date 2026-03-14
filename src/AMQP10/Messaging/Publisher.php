@@ -64,7 +64,6 @@ class Publisher
                 if (!$this->session->transport()->isConnected()) {
                     throw new PublishException('Connection closed while awaiting outcome');
                 }
-                usleep(1000);
                 continue;
             }
 
