@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace AMQP10\Tests\Messaging;
 
+use AMQP10\Client\Client;
 use AMQP10\Connection\Session;
 use AMQP10\Exception\MessageTimeoutException;
 use AMQP10\Messaging\Message;
@@ -147,12 +148,18 @@ class PublisherTest extends TestCase
             state:    PerformativeEncoder::accepted(),
         ));
 
-        $builder = new PublisherBuilder($session, '/queues/test');
+        $client = $this->createMock(Client::class);
+        $client->method('session')->willReturn($session);
+
+        $builder = new PublisherBuilder($client, '/queues/test');
         $outcome = $builder->send(new Message('hello'));
 
         $this->assertTrue($outcome->isAccepted());
 
-        // Verify DETACH was sent (PublisherBuilder calls close() after send)
+        // Explicitly close to trigger DETACH
+        $mock->clearSent();
+        $builder->close();
+
         $parser = new FrameParser();
         $parser->feed($mock->sent());
         $frames = $parser->readyFrames();
@@ -165,7 +172,7 @@ class PublisherTest extends TestCase
             }
         }
 
-        $this->assertTrue($detachFound, 'PublisherBuilder must send DETACH after publishing');
+        $this->assertTrue($detachFound, 'PublisherBuilder must send DETACH after close()');
     }
 
     public function test_send_throws_on_timeout(): void
@@ -215,7 +222,10 @@ class PublisherTest extends TestCase
             state:    PerformativeEncoder::accepted(),
         ));
 
-        $builder   = new PublisherBuilder($session, '/queues/test');
+        $client = $this->createMock(Client::class);
+        $client->method('session')->willReturn($session);
+
+        $builder   = new PublisherBuilder($client, '/queues/test');
         $publisher = $builder->publisher();
         $outcome1  = $publisher->send(new Message('first'));
         $outcome2  = $publisher->send(new Message('second'));

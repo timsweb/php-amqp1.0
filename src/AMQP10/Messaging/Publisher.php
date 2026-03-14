@@ -8,6 +8,7 @@ use AMQP10\Exception\MessageTimeoutException;
 use AMQP10\Exception\PublishException;
 use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\FrameParser;
+use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeDecoder;
 
 class Publisher
@@ -17,10 +18,20 @@ class Publisher
     public function __construct(
         private readonly Session $session,
         string                  $address,
-        private readonly float   $timeout = 30.0,
+        private readonly float   $timeout    = 30.0,
+        bool                    $preSettled  = false,
+        int                     $maxFrameSize = 65536,
     ) {
         $linkName   = 'sender-' . bin2hex(random_bytes(4));
-        $this->link = new SenderLink($session, name: $linkName, target: $address);
+        $this->link = new SenderLink(
+            $session,
+            name:          $linkName,
+            target:        $address,
+            sndSettleMode: $preSettled
+                ? PerformativeEncoder::SND_SETTLED
+                : PerformativeEncoder::SND_UNSETTLED,
+            maxFrameSize:  $maxFrameSize,
+        );
         $this->link->attach();
     }
 

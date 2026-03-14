@@ -99,7 +99,12 @@ class Client
 
     public function publish(string $address): PublisherBuilder
     {
-        return new PublisherBuilder($this->session(), $address, $this->config->timeout);
+        return new PublisherBuilder(
+            $this,
+            $address,
+            $this->config->timeout,
+            $this->connection?->negotiatedMaxFrameSize() ?? 65536,
+        );
     }
 
     public function consume(string $address): ConsumerBuilder

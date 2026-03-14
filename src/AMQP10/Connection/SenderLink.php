@@ -22,6 +22,7 @@ class SenderLink
         private readonly ?string $source         = null,
         private readonly int     $sndSettleMode  = PerformativeEncoder::SND_UNSETTLED,
         private readonly bool    $managementLink = false,
+        private readonly int     $maxFrameSize   = 65536,
     ) {
         $this->handle = $session->allocateHandle();
     }
@@ -65,14 +66,39 @@ class SenderLink
     {
         $deliveryId  = $this->session->nextDeliveryId();
         $deliveryTag = pack('N', $deliveryId);
-        $this->session->transport()->send(PerformativeEncoder::transfer(
-            channel:        $this->session->channel(),
-            handle:         $this->handle,
-            deliveryId:     $deliveryId,
-            deliveryTag:    $deliveryTag,
-            messagePayload: $messagePayload,
-            settled:        $this->sndSettleMode === PerformativeEncoder::SND_SETTLED,
-        ));
+        $settled     = $this->sndSettleMode === PerformativeEncoder::SND_SETTLED;
+
+        $overhead  = 50; // frame header + TRANSFER performative
+        $chunkSize = $this->maxFrameSize - $overhead;
+
+        if (strlen($messagePayload) <= $chunkSize) {
+            $this->session->transport()->send(PerformativeEncoder::transfer(
+                channel:        $this->session->channel(),
+                handle:         $this->handle,
+                deliveryId:     $deliveryId,
+                deliveryTag:    $deliveryTag,
+                messagePayload: $messagePayload,
+                settled:        $settled,
+                more:           false,
+            ));
+            return $deliveryId;
+        }
+
+        $chunks    = str_split($messagePayload, $chunkSize);
+        $lastIndex = count($chunks) - 1;
+        foreach ($chunks as $i => $chunk) {
+            $isFirst = $i === 0;
+            $isLast  = $i === $lastIndex;
+            $this->session->transport()->send(PerformativeEncoder::transfer(
+                channel:        $this->session->channel(),
+                handle:         $this->handle,
+                deliveryId:     $isFirst ? $deliveryId : null,
+                deliveryTag:    $isFirst ? $deliveryTag : null,
+                messagePayload: $chunk,
+                settled:        $settled,
+                more:           !$isLast,
+            ));
+        }
         return $deliveryId;
     }
 
