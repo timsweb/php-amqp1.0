@@ -5,6 +5,8 @@ namespace AMQP10\Connection;
 use AMQP10\Protocol\Descriptor;
 use AMQP10\Protocol\PerformativeEncoder;
 use AMQP10\Protocol\TypeEncoder;
+use AMQP10\Terminus\ExpiryPolicy;
+use AMQP10\Terminus\TerminusDurability;
 
 /**
  * An AMQP 1.0 receiver link (role=receiver, used for consuming).
@@ -16,14 +18,16 @@ class ReceiverLink
     private int  $handle;
 
     public function __construct(
-        private readonly Session  $session,
-        private readonly string   $name,
-        private readonly string   $source,
-        private readonly ?string  $target         = null,
-        private readonly int      $initialCredit  = 10,
-        private readonly bool     $managementLink = false,
+        private readonly Session              $session,
+        private readonly string               $name,
+        private readonly string               $source,
+        private readonly ?string              $target         = null,
+        private readonly int                  $initialCredit  = 10,
+        private readonly bool                 $managementLink = false,
         // Pre-encoded AMQP binary filter map for source terminus (TypeEncoder::encodeMap output), or null.
-        private readonly ?string  $filterMap      = null,
+        private readonly ?string              $filterMap      = null,
+        private readonly ?TerminusDurability  $durable        = null,
+        private readonly ?ExpiryPolicy        $expiryPolicy   = null,
     ) {
         $this->handle = $session->allocateHandle();
     }
@@ -35,14 +39,16 @@ class ReceiverLink
             : null;
 
         $this->session->transport()->send(PerformativeEncoder::attach(
-            channel:    $this->session->channel(),
-            name:       $this->name,
-            handle:     $this->handle,
-            role:       PerformativeEncoder::ROLE_RECEIVER,
-            source:     $this->source,
-            target:     $this->target,
-            properties: $properties,
-            filterMap:  $this->filterMap,
+            channel:      $this->session->channel(),
+            name:         $this->name,
+            handle:       $this->handle,
+            role:         PerformativeEncoder::ROLE_RECEIVER,
+            source:       $this->source,
+            target:       $this->target,
+            properties:   $properties,
+            filterMap:    $this->filterMap,
+            durable:      $this->durable,
+            expiryPolicy: $this->expiryPolicy,
         ));
         $this->session->readFrameOfType(Descriptor::ATTACH, $this->handle);
         $this->attached = true;
@@ -54,9 +60,9 @@ class ReceiverLink
         $this->session->transport()->send(PerformativeEncoder::flow(
             channel:        $this->session->channel(),
             nextIncomingId: 0,
-            incomingWindow: 2048,
+            incomingWindow: $this->session->incomingWindow(),
             nextOutgoingId: 0,
-            outgoingWindow: 2048,
+            outgoingWindow: $this->session->outgoingWindow(),
             handle:         $this->handle,
             deliveryCount:  $deliveryCount,
             linkCredit:     $credit,

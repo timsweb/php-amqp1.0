@@ -77,6 +77,16 @@ class Session
         return $this->transport;
     }
 
+    public function incomingWindow(): int
+    {
+        return $this->incomingWindow;
+    }
+
+    public function outgoingWindow(): int
+    {
+        return $this->outgoingWindow;
+    }
+
     /**
      * @param int      $descriptor           The performative descriptor to wait for.
      * @param int|null $rejectOnDetachHandle  If set, throw immediately if a DETACH arrives for this link handle.

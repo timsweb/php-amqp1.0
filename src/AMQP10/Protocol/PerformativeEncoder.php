@@ -2,6 +2,9 @@
 declare(strict_types=1);
 namespace AMQP10\Protocol;
 
+use AMQP10\Terminus\ExpiryPolicy;
+use AMQP10\Terminus\TerminusDurability;
+
 /**
  * Encodes AMQP 1.0 performatives as complete frames.
  * Each performative is a described type: \x00 + ulong(descriptor) + list(fields)
@@ -69,17 +72,19 @@ class PerformativeEncoder
      * @param array<mixed, mixed>|null $properties
      */
     public static function attach(
-        int     $channel,
-        string  $name,
-        int     $handle,
-        bool    $role,
-        ?string $source                  = null,
-        ?string $target                  = null,
-        int     $sndSettleMode           = self::SND_UNSETTLED,
-        int     $rcvSettleMode           = self::RCV_FIRST,
-        ?array  $properties              = null,
-        ?int    $initialDeliveryCount    = null,
-        ?string $filterMap               = null,
+        int                  $channel,
+        string               $name,
+        int                  $handle,
+        bool                 $role,
+        ?string              $source                  = null,
+        ?string              $target                  = null,
+        int                  $sndSettleMode           = self::SND_UNSETTLED,
+        int                  $rcvSettleMode           = self::RCV_FIRST,
+        ?array               $properties              = null,
+        ?int                 $initialDeliveryCount    = null,
+        ?string              $filterMap               = null,
+        ?TerminusDurability  $durable                 = null,
+        ?ExpiryPolicy        $expiryPolicy            = null,
     ): string {
         $fields = [
             TypeEncoder::encodeString($name),
@@ -87,7 +92,7 @@ class PerformativeEncoder
             TypeEncoder::encodeBool($role),
             TypeEncoder::encodeUbyte($sndSettleMode),
             TypeEncoder::encodeUbyte($rcvSettleMode),
-            self::encodeSource($source, $filterMap),
+            self::encodeSource($source, $filterMap, $durable, $expiryPolicy),
             self::encodeTarget($target),
             TypeEncoder::encodeNull(), // unsettled
             TypeEncoder::encodeNull(), // incomplete-unsettled
@@ -225,26 +230,39 @@ class PerformativeEncoder
         );
     }
 
-    private static function encodeSource(?string $address, ?string $filterMap = null): string
-    {
+    private static function encodeSource(
+        ?string             $address,
+        ?string             $filterMap    = null,
+        ?TerminusDurability $durable      = null,
+        ?ExpiryPolicy       $expiryPolicy = null,
+    ): string {
         if ($address === null) {
             return TypeEncoder::encodeNull();
         }
-        if ($filterMap === null) {
+        $hasExtras = $filterMap !== null || $durable !== null || $expiryPolicy !== null;
+        if (!$hasExtras) {
             $fields = [TypeEncoder::encodeString($address)];
         } else {
             $fields = [
                 TypeEncoder::encodeString($address),
-                TypeEncoder::encodeNull(), // durable
-                TypeEncoder::encodeNull(), // expiry-policy
+                $durable !== null
+                    ? TypeEncoder::encodeUint($durable->value)
+                    : TypeEncoder::encodeNull(),
+                $expiryPolicy !== null
+                    ? TypeEncoder::encodeSymbol($expiryPolicy->value)
+                    : TypeEncoder::encodeNull(),
                 TypeEncoder::encodeNull(), // timeout
                 TypeEncoder::encodeNull(), // dynamic
                 TypeEncoder::encodeNull(), // dynamic-node-properties
                 TypeEncoder::encodeNull(), // distribution-mode
-                $filterMap,               // filter (field 7)
+                $filterMap !== null
+                    ? $filterMap
+                    : TypeEncoder::encodeNull(),
                 TypeEncoder::encodeNull(), // default-outcome
                 TypeEncoder::encodeNull(), // outcomes
-                TypeEncoder::encodeSymbolArray(['rabbit:stream']), // capabilities (field 10)
+                $filterMap !== null
+                    ? TypeEncoder::encodeSymbolArray(['rabbit:stream'])
+                    : TypeEncoder::encodeNull(),
             ];
         }
         return TypeEncoder::encodeDescribed(
