@@ -15,7 +15,8 @@ use AMQP10\Transport\TransportInterface;
 class Connection
 {
     private bool $open = false;
-    private int  $negotiatedMaxFrameSize = 65536;
+    private int  $negotiatedMaxFrameSize  = 65536;
+    private int  $negotiatedIdleTimeout   = 60000;
     private readonly string $containerId;
 
     /**
@@ -46,7 +47,7 @@ class Connection
         );
 
         $this->saslHandshake($sasl);
-        $this->amqpOpen($parts['host'] ?? 'localhost');
+        $this->amqpOpen(self::resolveVhost($this->uri));
         $this->open = true;
     }
 
@@ -67,6 +68,20 @@ class Connection
     public function negotiatedMaxFrameSize(): int
     {
         return $this->negotiatedMaxFrameSize;
+    }
+
+    public function negotiatedIdleTimeout(): int
+    {
+        return $this->negotiatedIdleTimeout;
+    }
+
+    private static function resolveVhost(string $uri): string
+    {
+        $parts = parse_url($uri);
+        $host  = $parts['host'] ?? 'localhost';
+        $path  = isset($parts['path']) ? urldecode(ltrim($parts['path'], '/')) : '';
+
+        return $path !== '' ? $path : $host;
     }
 
     private function saslHandshake(Sasl $sasl): void
@@ -110,6 +125,9 @@ class Connection
 
         if (isset($open['value'][2]) && $open['value'][2] > 0) {
             $this->negotiatedMaxFrameSize = min($this->negotiatedMaxFrameSize, $open['value'][2]);
+        }
+        if (isset($open['value'][4]) && is_int($open['value'][4]) && $open['value'][4] > 0) {
+            $this->negotiatedIdleTimeout = $open['value'][4];
         }
     }
 
