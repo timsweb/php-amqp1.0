@@ -104,7 +104,7 @@ class Client
 
     public function consume(string $address): ConsumerBuilder
     {
-        return new ConsumerBuilder($this->session(), $address, $this->config->timeout);
+        return new ConsumerBuilder($this, $address, $this->config->timeout);
     }
 
     public function management(): Management
@@ -112,7 +112,7 @@ class Client
         return new Management($this->session(), $this->config->timeout);
     }
 
-    private function session(): Session
+    public function session(): Session
     {
         if ($this->session === null) {
             throw new \RuntimeException('Call connect() before using the client');
