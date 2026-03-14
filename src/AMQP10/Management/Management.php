@@ -24,7 +24,8 @@ class Management
 
     private readonly string $replyTo;
 
-    private int $requestId = 0;
+    private int  $requestId = 0;
+    private bool $closed    = false;
 
     public function __construct(
         private readonly Session $session,
@@ -133,6 +134,12 @@ class Management
     {
         $this->receiver->detach();
         $this->sender->detach();
+        $this->closed = true;
+    }
+
+    public function isClosed(): bool
+    {
+        return $this->closed;
     }
 
     /** @return array<string, mixed> */

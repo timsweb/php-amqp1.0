@@ -161,7 +161,7 @@ class Client
 
     public function management(): Management
     {
-        if ($this->management === null) {
+        if ($this->management === null || $this->management->isClosed()) {
             $this->management = new Management($this->session(), $this->config->timeout);
         }
 
