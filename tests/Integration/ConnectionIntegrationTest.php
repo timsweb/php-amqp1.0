@@ -7,9 +7,15 @@ class ConnectionIntegrationTest extends IntegrationTestCase
 {
     public function test_can_connect_and_disconnect(): void
     {
-        $client = $this->newClient()->connect();
-        $this->assertTrue($client->isConnected());
-        $client->close();
-        $this->assertFalse($client->isConnected());
+        $connectedBefore  = false;
+        $connectedAfter   = true;
+        $this->runInEventLoop(function () use (&$connectedBefore, &$connectedAfter): void {
+            $client = $this->newClient()->connect();
+            $connectedBefore = $client->isConnected();
+            $client->close();
+            $connectedAfter = $client->isConnected();
+        });
+        $this->assertTrue($connectedBefore);
+        $this->assertFalse($connectedAfter);
     }
 }
