@@ -51,16 +51,13 @@ Client API          src/AMQP10/Client/
 
 ```bash
 # Unit tests only (no broker needed)
-./vendor/bin/phpunit
+./vendor/bin/phpunit --testsuite Unit
 
-# Integration tests (requires RabbitMQ 4.x on localhost:5672)
-./vendor/bin/phpunit tests/Integration
-
-# RabbitMQ via Docker
-docker run -d --name rabbitmq-amqp10-test -p 5672:5672 -p 15672:15672 rabbitmq:4-management
+# Integration tests (starts RabbitMQ automatically via testcontainers — requires Docker)
+./vendor/bin/phpunit --testsuite Integration
 ```
 
-Integration tests connect to `amqp://guest:guest@localhost:5672/`. See `tests/Integration/IntegrationTestCase.php`.
+Integration tests spin up a RabbitMQ 4.x container automatically via testcontainers-php. See `tests/Integration/RabbitMqTestCase.php`.
 
 ---
 
@@ -174,7 +171,36 @@ RabbitMQ's AMQP 1.0 filter documentation doesn't always match the implementation
 /opt/rabbitmq/plugins/rabbit-4.2.4/ebin/rabbit_amqp_sql_lexer.beam    # tokenizer
 ```
 
-### 7. Unit tests passing does not mean the wire format is correct
+### 7. Background EventLoop watchers MUST be unreferenced
+
+The library uses a "transparent event loop" pattern: `RevoltTransport::send()` and `read()` detect `Fiber::getCurrent()` and, when called outside a Fiber, wrap operations in `EventLoop::queue() + EventLoop::run()`. This only terminates correctly when no **referenced** persistent watchers are alive.
+
+Any `EventLoop::repeat()` or other persistent watcher that exists for background purposes (e.g. the AMQP heartbeat timer in `Client::connect()`) must be marked as background work with `EventLoop::unreference()` immediately after creation:
+
+```php
+$this->heartbeatTimerId = EventLoop::repeat($intervalSec, $callback);
+EventLoop::unreference($this->heartbeatTimerId); // REQUIRED — omitting this causes every one-shot operation to hang forever
+```
+
+**Unreferenced watchers still fire** — the connection stays alive — but they no longer prevent `EventLoop::run()` from returning when the real work is done.
+
+The canary tests in `tests/Unit/Transport/EventLoopInvariantsTest.php` guard against this regression. If those tests hang, a referenced persistent watcher has been introduced somewhere.
+
+### 8. Management instances track their own closed state; Client caches them
+
+`Client::management()` caches the `Management` instance to avoid leaking AMQP links on repeated calls. However, callers may close management explicitly with `$mgmt->close()` and then call `$client->management()` again expecting a fresh, usable instance.
+
+To support this, `Management` tracks whether it has been closed (`isClosed()`), and `Client::management()` creates a new instance if the cached one is closed:
+
+```php
+if ($this->management === null || $this->management->isClosed()) {
+    $this->management = new Management($this->session(), $this->config->timeout);
+}
+```
+
+**Why this matters:** a closed `Management` has detached its AMQP sender/receiver links. Using it for further requests sends frames with dead handles. The broker responds with an error frame that `awaitResponse()` silently ignores (it only looks for TRANSFER frames), causing a 30-second timeout spin before throwing `ManagementException`.
+
+### 9. Unit tests passing does not mean the wire format is correct
 
 `TypeDecoder` decodes both `STR8` and `SYM8` to plain PHP strings, so unit tests asserting decoded map structure can't tell whether the encoder chose the right AMQP type. Always validate filter behaviour against a live RabbitMQ instance when changing encoding logic.
 

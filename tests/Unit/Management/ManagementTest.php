@@ -227,6 +227,32 @@ class ManagementTest extends TestCase
         $this->assertNotEmpty($mock->sent());
     }
 
+    public function test_is_closed_returns_false_before_close(): void
+    {
+        [$mock, $management] = $this->makeManagement();
+
+        $this->assertFalse($management->isClosed());
+    }
+
+    public function test_is_closed_returns_true_after_close(): void
+    {
+        [$mock, $management] = $this->makeManagement();
+
+        $management->close();
+
+        $this->assertTrue($management->isClosed());
+    }
+
+    public function test_close_is_idempotent(): void
+    {
+        [$mock, $management] = $this->makeManagement();
+
+        $management->close();
+        $management->close(); // must not throw or send extra frames
+
+        $this->assertTrue($management->isClosed());
+    }
+
     public function test_await_response_throws_on_timeout(): void
     {
         $mock = new TransportMock();
