@@ -21,10 +21,10 @@ class MessageEncoder
     {
         $sections = '';
 
-        // Header section (if TTL or priority set)
-        if ($message->ttl() > 0 || $message->priority() !== 4) {
+        // Header section (if TTL, priority, or durable differs from default)
+        if ($message->ttl() > 0 || $message->priority() !== 4 || !$message->durable()) {
             $sections .= self::section(Descriptor::MSG_HEADER, [
-                TypeEncoder::encodeBool(false),             // durable
+                TypeEncoder::encodeBool($message->durable()),  // durable
                 TypeEncoder::encodeUbyte($message->priority()), // priority
                 $message->ttl() > 0
                     ? TypeEncoder::encodeUint($message->ttl())
@@ -51,7 +51,7 @@ class MessageEncoder
 
         // Properties section (spec §3.2.4)
         $props = $message->properties();
-        if (!empty($props)) {
+        if (!empty($props) || $message->subject() !== null) {
             $sections .= self::section(Descriptor::MSG_PROPERTIES, [
                 isset($props['message-id'])
                     ? TypeEncoder::encodeString($props['message-id'])
@@ -62,8 +62,8 @@ class MessageEncoder
                 isset($props['to'])
                     ? TypeEncoder::encodeString($props['to'])
                     : TypeEncoder::encodeNull(),
-                isset($props['subject'])
-                    ? TypeEncoder::encodeString($props['subject'])
+                ($message->subject() ?? $props['subject'] ?? null) !== null
+                    ? TypeEncoder::encodeString($message->subject() ?? $props['subject'])
                     : TypeEncoder::encodeNull(),
                 isset($props['reply-to'])
                     ? TypeEncoder::encodeString($props['reply-to'])

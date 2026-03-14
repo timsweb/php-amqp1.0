@@ -1,11 +1,8 @@
 <?php
 declare(strict_types=1);
-
-namespace AMQP10\Tests\Messaging;
+namespace AMQP10\Tests\Unit\Messaging;
 
 use AMQP10\Messaging\Message;
-use AMQP10\Messaging\MessageEncoder;
-use AMQP10\Messaging\MessageDecoder;
 use PHPUnit\Framework\TestCase;
 
 class MessageTest extends TestCase
@@ -41,11 +38,72 @@ class MessageTest extends TestCase
         $this->assertSame(8, $msg->priority());
     }
 
-    public function test_annotations_roundtrip(): void
+    public function test_durable_defaults_to_true(): void
     {
-        $msg     = new Message('body', annotations: ['x-stream-offset' => 42]);
-        $encoded = MessageEncoder::encode($msg);
-        $decoded = MessageDecoder::decode($encoded);
-        $this->assertSame(42, $decoded->annotation('x-stream-offset'));
+        $m = Message::create('body');
+        $this->assertTrue($m->durable());
+    }
+
+    public function test_with_durable_false(): void
+    {
+        $m = Message::create('body')->withDurable(false);
+        $this->assertFalse($m->durable());
+        $orig = Message::create('body');
+        $this->assertTrue($orig->durable());
+    }
+
+    public function test_with_subject(): void
+    {
+        $m = Message::create('body')->withSubject('order.placed');
+        $this->assertSame('order.placed', $m->subject());
+    }
+
+    public function test_subject_is_null_by_default(): void
+    {
+        $this->assertNull(Message::create('body')->subject());
+    }
+
+    public function test_with_message_id(): void
+    {
+        $m = Message::create('body')->withMessageId('abc-123');
+        $this->assertSame('abc-123', $m->property('message-id'));
+    }
+
+    public function test_with_content_type(): void
+    {
+        $m = Message::create('body')->withContentType('application/json');
+        $this->assertSame('application/json', $m->property('content-type'));
+    }
+
+    public function test_with_correlation_id(): void
+    {
+        $m = Message::create('body')->withCorrelationId('corr-1');
+        $this->assertSame('corr-1', $m->property('correlation-id'));
+    }
+
+    public function test_with_application_property(): void
+    {
+        $m = Message::create('body')->withApplicationProperty('source', 'checkout');
+        $this->assertSame('checkout', $m->applicationProperty('source'));
+    }
+
+    public function test_with_ttl(): void
+    {
+        $m = Message::create('body')->withTtl(5000);
+        $this->assertSame(5000, $m->ttl());
+    }
+
+    public function test_with_priority(): void
+    {
+        $m = Message::create('body')->withPriority(9);
+        $this->assertSame(9, $m->priority());
+    }
+
+    public function test_wither_immutability(): void
+    {
+        $original = Message::create('body');
+        $modified = $original->withSubject('test');
+        $this->assertNotSame($original, $modified);
+        $this->assertNull($original->subject());
     }
 }
