@@ -141,21 +141,22 @@ class PerformativeEncoder
     }
 
     public static function transfer(
-        int    $channel,
-        int    $handle,
-        int    $deliveryId,
-        string $deliveryTag,
-        string $messagePayload,
-        bool   $settled       = false,
-        int    $messageFormat = 0,
+        int     $channel,
+        int     $handle,
+        ?int    $deliveryId,
+        ?string $deliveryTag,
+        string  $messagePayload,
+        bool    $settled       = false,
+        int     $messageFormat = 0,
+        bool    $more          = false,
     ): string {
         $fields = [
             TypeEncoder::encodeUint($handle),
-            TypeEncoder::encodeUint($deliveryId),
-            TypeEncoder::encodeBinary($deliveryTag),
+            $deliveryId !== null ? TypeEncoder::encodeUint($deliveryId) : TypeEncoder::encodeNull(),
+            $deliveryTag !== null ? TypeEncoder::encodeBinary($deliveryTag) : TypeEncoder::encodeNull(),
             TypeEncoder::encodeUint($messageFormat),
             TypeEncoder::encodeBool($settled),
-            TypeEncoder::encodeBool(false),
+            TypeEncoder::encodeBool($more),
         ];
         $body = self::described(Descriptor::TRANSFER, $fields) . $messagePayload;
         return FrameBuilder::amqp(channel: $channel, body: $body);
