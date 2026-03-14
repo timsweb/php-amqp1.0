@@ -18,39 +18,27 @@ composer require php-amqp10/client
 
 ### Connecting
 
-The client uses [Revolt](https://revolt.run/) Fibers for non-blocking I/O. All client operations must run inside an `EventLoop::queue()` callback:
+The client uses [Revolt](https://revolt.run/) Fibers for non-blocking I/O. For one-off operations (publishing during a web request, running a script) **no event loop boilerplate is needed** — the library handles it transparently:
 
 ```php
-use Revolt\EventLoop;
+$client = new \AMQP10\Client\Client('amqp://guest:guest@localhost:5672');
+$client->connect();
 
-EventLoop::queue(function () {
-    $client = new \AMQP10\Client\Client('amqp://guest:guest@localhost:5672');
-    $client->connect();
+// ... use the client ...
 
-    // ... use the client ...
-
-    $client->close();
-});
-
-EventLoop::run();
+$client->close();
 ```
+
+Long-running consumers manage the event loop internally via `ConsumerBuilder::run()` — see [Consuming Messages](#consuming-messages).
+
+If you are already running a [Revolt](https://revolt.run/) or [Amp](https://amphp.org/) event loop, the client integrates naturally — just call it from within your existing loop context.
 
 ### TLS Connection
 
 ```php
-use Revolt\EventLoop;
-
-EventLoop::queue(function () {
-    $client = (new \AMQP10\Client\Client('amqps://user:pass@broker.example.com:5671'))
-        ->withTlsOptions(['cafile' => '/path/to/ca.pem'])
-        ->connect();
-
-    // ... use the client ...
-
-    $client->close();
-});
-
-EventLoop::run();
+$client = (new \AMQP10\Client\Client('amqps://user:pass@broker.example.com:5671'))
+    ->withTlsOptions(['cafile' => '/path/to/ca.pem'])
+    ->connect();
 ```
 
 ### Virtual Hosts
@@ -65,27 +53,23 @@ $client = new \AMQP10\Client\Client('amqp://user:pass@host/%2F');
 
 ### Publishing Messages
 
+Publishing works directly — no event loop setup required:
+
 ```php
 use AMQP10\Client\Client;
 use AMQP10\Messaging\Message;
-use Revolt\EventLoop;
 
-EventLoop::queue(function () {
-    $client = new Client('amqp://guest:guest@localhost:5672');
-    $client->connect();
+$client = new Client('amqp://guest:guest@localhost:5672');
+$client->connect();
 
-    $message = Message::create('Hello, world!');
+$outcome = $client->publish('/queues/my-queue')
+    ->send(Message::create('Hello, world!'));
 
-    $outcome = $client->publish('/queues/my-queue')->send($message);
+if ($outcome->isAccepted()) {
+    echo "Message accepted\n";
+}
 
-    if ($outcome->isAccepted()) {
-        echo "Message accepted\n";
-    }
-
-    $client->close();
-});
-
-EventLoop::run();
+$client->close();
 ```
 
 ### Message API — Factory and Wither Methods
@@ -99,78 +83,55 @@ $message = Message::create('{"orderId": 123}')
     ->withMessageId('msg-abc-123')
     ->withCorrelationId('order-123')
     ->withApplicationProperty('source', 'checkout')
-    ->withTtl(30000)    // TTL in milliseconds
+    ->withTtl(30000)     // TTL in milliseconds
     ->withDurable(true); // default is true
-```
-
-### Publishing with Properties (legacy constructor style)
-
-```php
-use AMQP10\Messaging\Message;
-
-$message = new Message(
-    body: 'Hello, world!',
-    properties: [
-        'content-type'   => 'text/plain',
-        'correlation-id' => '12345',
-    ],
-    applicationProperties: [
-        'priority' => 'high',
-    ],
-    ttl: 60000, // 60 seconds
-    priority: 8,
-);
-
-$client->publish('/queues/my-queue')->send($message);
 ```
 
 ### Fire-and-Forget Publishing (Pre-settled)
 
-Pre-settled messages are sent without waiting for a broker disposition. This is the highest-throughput mode.
+Pre-settled messages are sent without waiting for a broker disposition — highest throughput mode:
 
 ```php
-use AMQP10\Messaging\Message;
-use Revolt\EventLoop;
-
-EventLoop::queue(function () use ($client) {
-    $client->publish('/exchanges/events')
-        ->fireAndForget()           // pre-settled, no disposition wait
-        ->send(Message::create($payload)->withSubject('order.placed'));
-});
-
-EventLoop::run();
+$client->publish('/exchanges/events')
+    ->fireAndForget()
+    ->send(Message::create($payload)->withSubject('order.placed'));
 ```
 
 ### Consuming Messages
 
+`ConsumerBuilder::run()` blocks until the consumer exits, managing the event loop internally. Use `stopOnSignal()` for graceful shutdown:
+
 ```php
+use AMQP10\Client\Client;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\DeliveryContext;
-use Revolt\EventLoop;
 
-EventLoop::queue(function () {
-    $client = new \AMQP10\Client\Client('amqp://guest:guest@localhost:5672');
-    $client->connect();
+$client = new Client('amqp://guest:guest@localhost:5672');
+$client->connect();
 
-    $client->consume('/queues/my-queue')
-        ->handle(function (Message $msg, DeliveryContext $ctx) use ($client) {
-            echo "Received: " . $msg->body() . "\n";
+$client->consume('/queues/my-queue')
+    ->handle(function (Message $msg, DeliveryContext $ctx) {
+        echo "Received: " . $msg->body() . "\n";
+        $ctx->accept();
+    })
+    ->stopOnSignal(SIGINT, SIGTERM)  // Ctrl+C stops cleanly after current message
+    ->run();                          // blocks here
 
-            // Access message properties
-            echo "Content-Type: " . $msg->property('content-type') . "\n";
-            echo "Source: " . $msg->applicationProperty('source') . "\n";
-
-            // Acknowledge the message
-            $ctx->accept();
-
-            // Stop consuming after one message
-            $client->close();
-        })
-        ->run();
-});
-
-EventLoop::run();
+$client->close();
 ```
+
+The optional second argument to `stopOnSignal()` is a callback fired when the signal arrives — useful for logging or console output:
+
+```php
+$client->consume('/queues/my-queue')
+    ->handle(fn(Message $msg, DeliveryContext $ctx) => $ctx->accept())
+    ->stopOnSignal(SIGINT, SIGTERM, function (int $signal) use ($output) {
+        $output->writeln('<comment>Signal ' . $signal . ' received, finishing current message...</comment>');
+    })
+    ->run();
+```
+
+> **Note:** `stopOnSignal()` requires the `ext-pcntl` PHP extension. Without it, signal registration is silently skipped and the consumer runs until it times out or the connection closes.
 
 ### Consuming with Prefetch
 
@@ -181,6 +142,7 @@ $client->consume('/queues/my-queue')
         processMessage($msg);
         $ctx->accept();
     })
+    ->stopOnSignal(SIGINT)
     ->run();
 ```
 
@@ -189,26 +151,20 @@ $client->consume('/queues/my-queue')
 A durable consumer with a stable link name will resume from where it left off after reconnection:
 
 ```php
-use AMQP10\Messaging\Message;
-use AMQP10\Messaging\DeliveryContext;
 use AMQP10\Terminus\ExpiryPolicy;
 use AMQP10\Terminus\TerminusDurability;
-use Revolt\EventLoop;
 
-EventLoop::queue(function () use ($client) {
-    $client->consume('/queues/orders')
-        ->linkName('order-processor')                       // stable link name survives reconnect
-        ->durable(TerminusDurability::UnsettledState)
-        ->expiryPolicy(ExpiryPolicy::Never)
-        ->withReconnect(maxRetries: 10, backoffMs: 1000)
-        ->handle(function (Message $msg, DeliveryContext $ctx) {
-            // process message
-            $ctx->accept();
-        })
-        ->run();
-});
-
-EventLoop::run();
+$client->consume('/queues/orders')
+    ->linkName('order-processor')                    // stable link name survives reconnect
+    ->durable(TerminusDurability::UnsettledState)
+    ->expiryPolicy(ExpiryPolicy::Never)
+    ->withReconnect(maxRetries: 10, backoffMs: 1000)
+    ->handle(function (Message $msg, DeliveryContext $ctx) {
+        // process message
+        $ctx->accept();
+    })
+    ->stopOnSignal(SIGINT, SIGTERM)
+    ->run();
 ```
 
 ## Message Context
@@ -357,6 +313,8 @@ $client->consume('/queues/my-queue')
     ->onError(function (\Throwable $error) {
         error_log("Consumer error: " . $error->getMessage());
     })
+    ->stopOnSignal(SIGINT, SIGTERM)                      // Graceful shutdown on signal (requires ext-pcntl)
+    ->stopOnSignal(SIGINT, fn(int $sig) => log($sig))    // With custom callback
     ->run();
 ```
 
@@ -420,24 +378,19 @@ use AMQP10\Client\Client;
 use AMQP10\Exception\AuthenticationException;
 use AMQP10\Exception\AmqpException;
 use AMQP10\Messaging\Message;
-use Revolt\EventLoop;
 
-EventLoop::queue(function () {
-    $client = new Client('amqp://guest:guest@localhost:5672');
+$client = new Client('amqp://guest:guest@localhost:5672');
 
-    try {
-        $client->connect();
-        $client->publish('/queues/my-queue')->send(Message::create('test'));
-    } catch (AuthenticationException $e) {
-        echo "Authentication failed: " . $e->getMessage() . "\n";
-    } catch (AmqpException $e) {
-        echo "AMQP error: " . $e->getMessage() . "\n";
-    } finally {
-        $client->close();
-    }
-});
-
-EventLoop::run();
+try {
+    $client->connect();
+    $client->publish('/queues/my-queue')->send(Message::create('test'));
+} catch (AuthenticationException $e) {
+    echo "Authentication failed: " . $e->getMessage() . "\n";
+} catch (AmqpException $e) {
+    echo "AMQP error: " . $e->getMessage() . "\n";
+} finally {
+    $client->close();
+}
 ```
 
 ## Running Tests
@@ -449,8 +402,8 @@ composer install
 # Run unit tests
 ./vendor/bin/phpunit
 
-# Run integration tests (requires running RabbitMQ 4.0+ with AMQP 1.0)
-./vendor/bin/phpunit --configuration phpunit-integration.xml
+# Run integration tests (starts RabbitMQ automatically via testcontainers — requires Docker)
+./vendor/bin/phpunit --testsuite Integration
 ```
 
 ## License
