@@ -750,4 +750,45 @@ class ConsumerTest extends TestCase
 
         $this->assertInstanceOf(ConsumerBuilder::class, $result);
     }
+
+    public function test_stop_flag_starts_false_and_is_true_after_stop(): void
+    {
+        [$mock, $session, $client] = $this->makeClient();
+
+        $consumer = new Consumer($client, '/queues/test', credit: 1);
+
+        $ref = new \ReflectionProperty(Consumer::class, 'stopRequested');
+        $ref->setAccessible(true);
+
+        $this->assertFalse($ref->getValue($consumer));
+
+        $consumer->stop();
+
+        $this->assertTrue($ref->getValue($consumer));
+    }
+
+    public function test_stop_causes_receive_to_return_null(): void
+    {
+        [$mock, $session, $client] = $this->makeClient();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0, name: 'recv', handle: 0,
+            role:    PerformativeEncoder::ROLE_SENDER,
+            source:  '/queues/test', target: null,
+        ));
+
+        $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 5.0);
+        // Ensure attached
+        $consumer->receive(); // will idle-timeout (no messages) — but first we need attached state
+
+        // Actually test stop: set attached state then call stop() before receive()
+        $refAttached = new \ReflectionProperty(Consumer::class, 'attached');
+        $refAttached->setAccessible(true);
+        $refAttached->setValue($consumer, true);
+
+        $consumer->stop();
+        $result = $consumer->receive();
+
+        $this->assertNull($result);
+    }
 }

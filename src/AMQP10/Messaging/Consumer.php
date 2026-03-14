@@ -16,9 +16,10 @@ use AMQP10\Terminus\TerminusDurability;
 
 class Consumer
 {
-    private ?ReceiverLink $link     = null;
-    private bool          $attached = false;
-    private int           $received = 0;
+    private ?ReceiverLink $link          = null;
+    private bool          $attached      = false;
+    private bool          $stopRequested = false;
+    private int           $received      = 0;
 
     /** @var array<int, string> */
     private array $partialDeliveries = [];
@@ -64,12 +65,18 @@ class Consumer
         }
     }
 
+    public function stop(): void
+    {
+        $this->stopRequested = true;
+    }
+
     public function reattach(Session $session): void
     {
-        $this->link     = $this->buildLink($session);
+        $this->link          = $this->buildLink($session);
         $this->link->attach();
-        $this->attached = true;
-        $this->received = 0;
+        $this->attached      = true;
+        $this->received      = 0;
+        $this->stopRequested = false;
     }
 
     public function receive(): ?Delivery
@@ -80,6 +87,9 @@ class Consumer
         $replenish = (int) floor($this->credit / 2);
 
         while (true) {
+            if ($this->stopRequested) {
+                return null;
+            }
             $frame = $this->client->session()->nextFrame();
             if ($frame === null) {
                 if (!$this->client->session()->transport()->isConnected()) {

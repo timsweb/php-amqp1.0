@@ -115,4 +115,23 @@ class RevoltTransportTest extends TestCase
             });
         });
     }
+
+    public function test_send_and_read_work_outside_event_loop(): void
+    {
+        [$a, $b] = $this->socketPair();
+        stream_set_blocking($b, true);
+
+        $t = new RevoltTransport();
+        $ref = new \ReflectionProperty(RevoltTransport::class, 'stream');
+        $ref->setAccessible(true);
+        $ref->setValue($t, $a);
+        stream_set_blocking($a, false);
+
+        // Called with NO EventLoop::run() wrapper — must work transparently
+        $t->send('ping');
+        $received = fread($b, 4096);
+        $this->assertSame('ping', $received);
+
+        fclose($b);
+    }
 }

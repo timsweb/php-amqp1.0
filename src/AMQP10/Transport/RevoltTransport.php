@@ -53,6 +53,50 @@ class RevoltTransport implements TransportInterface
         if ($this->stream === null) {
             throw new ConnectionFailedException('Not connected');
         }
+        if (\Fiber::getCurrent() !== null) {
+            $this->sendInFiber($bytes);
+            return;
+        }
+        $exception = null;
+        \Revolt\EventLoop::queue(function () use ($bytes, &$exception): void {
+            try {
+                $this->sendInFiber($bytes);
+            } catch (\Throwable $e) {
+                $exception = $e;
+            }
+        });
+        \Revolt\EventLoop::run();
+        if ($exception !== null) {
+            throw $exception;
+        }
+    }
+
+    public function read(int $length = 4096): ?string
+    {
+        if ($this->stream === null) {
+            throw new ConnectionFailedException('Not connected');
+        }
+        if (\Fiber::getCurrent() !== null) {
+            return $this->readInFiber($length);
+        }
+        $result    = null;
+        $exception = null;
+        \Revolt\EventLoop::queue(function () use ($length, &$result, &$exception): void {
+            try {
+                $result = $this->readInFiber($length);
+            } catch (\Throwable $e) {
+                $exception = $e;
+            }
+        });
+        \Revolt\EventLoop::run();
+        if ($exception !== null) {
+            throw $exception;
+        }
+        return $result;
+    }
+
+    private function sendInFiber(string $bytes): void
+    {
         $total  = strlen($bytes);
         $offset = 0;
         while ($offset < $total) {
@@ -77,12 +121,8 @@ class RevoltTransport implements TransportInterface
         }
     }
 
-    public function read(int $length = 4096): ?string
+    private function readInFiber(int $length): ?string
     {
-        if ($this->stream === null) {
-            throw new ConnectionFailedException('Not connected');
-        }
-
         $data = @fread($this->stream, $length);
 
         if ($data === false) {

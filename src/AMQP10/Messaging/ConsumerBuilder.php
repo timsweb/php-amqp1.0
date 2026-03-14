@@ -22,6 +22,9 @@ class ConsumerBuilder
     private ?ExpiryPolicy       $expiryPolicy       = null;
     private int                 $reconnectRetries   = 0;
     private int                 $reconnectBackoffMs = 1000;
+    /** @var int[] */
+    private array               $stopSignals        = [];
+    private ?\Closure           $signalHandler      = null;
 
     public function __construct(
         private readonly Client $client,
@@ -109,10 +112,72 @@ class ConsumerBuilder
         return $this;
     }
 
+    /**
+     * Register OS signals that trigger graceful consumer shutdown.
+     *
+     * @param int|int[] $signals  e.g. SIGINT, or [SIGINT, SIGTERM]
+     * @param \Closure|null $handler  Optional callback fired on signal before shutdown.
+     *                                Receives the signal number as its only argument.
+     *                                Useful for logging, console output, cleanup, etc.
+     *                                Requires ext-pcntl.
+     */
+    public function stopOnSignal(int|array $signals, ?\Closure $handler = null): self
+    {
+        $this->stopSignals   = is_array($signals) ? $signals : [$signals];
+        $this->signalHandler = $handler;
+        return $this;
+    }
+
     public function run(): void
     {
-        $consumer = $this->consumer();
-        $consumer->run($this->handler, $this->errorHandler);
+        $consumer     = $this->consumer();
+        $handler      = $this->handler;
+        $errorHandler = $this->errorHandler;
+
+        $execute = function () use ($consumer, $handler, $errorHandler): void {
+            $watcherIds = [];
+
+            if (!empty($this->stopSignals) && \extension_loaded('pcntl')) {
+                foreach ($this->stopSignals as $signal) {
+                    $watcherIds[] = \Revolt\EventLoop::onSignal(
+                        $signal,
+                        function () use ($consumer, $signal): void {
+                            if ($this->signalHandler !== null) {
+                                ($this->signalHandler)($signal);
+                            }
+                            $consumer->stop();
+                        }
+                    );
+                }
+            }
+
+            try {
+                $consumer->run($handler, $errorHandler);
+            } finally {
+                foreach ($watcherIds as $id) {
+                    \Revolt\EventLoop::cancel($id);
+                }
+            }
+        };
+
+        if (\Fiber::getCurrent() !== null) {
+            $execute();
+            return;
+        }
+
+        $exception = null;
+        \Revolt\EventLoop::queue(static function () use ($execute, &$exception): void {
+            try {
+                $execute();
+            } catch (\Throwable $e) {
+                $exception = $e;
+            }
+        });
+        \Revolt\EventLoop::run();
+
+        if ($exception !== null) {
+            throw $exception;
+        }
     }
 
     public function consumer(): Consumer
