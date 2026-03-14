@@ -6,6 +6,7 @@ Modern PHP AMQP 1.0 client library for RabbitMQ 4.0+ with a fluent, type-safe AP
 
 - PHP 8.2 or higher
 - RabbitMQ 4.0+
+- revolt/event-loop ^1.0
 
 ## Installation
 
@@ -17,15 +18,49 @@ composer require php-amqp10/client
 
 ### Connecting
 
+The client uses [Revolt](https://revolt.run/) Fibers for non-blocking I/O. All client operations must run inside an `EventLoop::queue()` callback:
+
 ```php
-use AMQP10\Client\Client;
+use Revolt\EventLoop;
 
-$client = new Client('amqp://guest:guest@localhost:5672/');
-$client->connect();
+EventLoop::queue(function () {
+    $client = new \AMQP10\Client\Client('amqp://guest:guest@localhost:5672');
+    $client->connect();
 
-// ... work with the client ...
+    // ... use the client ...
 
-$client->close();
+    $client->close();
+});
+
+EventLoop::run();
+```
+
+### TLS Connection
+
+```php
+use Revolt\EventLoop;
+
+EventLoop::queue(function () {
+    $client = (new \AMQP10\Client\Client('amqps://user:pass@broker.example.com:5671'))
+        ->withTlsOptions(['cafile' => '/path/to/ca.pem'])
+        ->connect();
+
+    // ... use the client ...
+
+    $client->close();
+});
+
+EventLoop::run();
+```
+
+### Virtual Hosts
+
+```php
+// Explicit vhost via URI path
+$client = new \AMQP10\Client\Client('amqp://user:pass@host/my-vhost');
+
+// RabbitMQ default vhost (/) using URL encoding
+$client = new \AMQP10\Client\Client('amqp://user:pass@host/%2F');
 ```
 
 ### Publishing Messages
@@ -33,30 +68,45 @@ $client->close();
 ```php
 use AMQP10\Client\Client;
 use AMQP10\Messaging\Message;
+use Revolt\EventLoop;
 
-$client = new Client('amqp://guest:guest@localhost:5672/');
-$client->connect();
+EventLoop::queue(function () {
+    $client = new Client('amqp://guest:guest@localhost:5672');
+    $client->connect();
 
-$address = 'my-queue';
-$message = new Message('Hello, world!');
+    $message = Message::create('Hello, world!');
 
-$outcome = $client->publish($address)->send($message);
+    $outcome = $client->publish('/queues/my-queue')->send($message);
 
-if ($outcome->isAccepted()) {
-    echo "Message accepted\n";
-}
+    if ($outcome->isAccepted()) {
+        echo "Message accepted\n";
+    }
 
-$client->close();
+    $client->close();
+});
+
+EventLoop::run();
 ```
 
-### Publishing with Properties
+### Message API — Factory and Wither Methods
 
 ```php
-use AMQP10\Client\Client;
 use AMQP10\Messaging\Message;
 
-$client = new Client('amqp://guest:guest@localhost:5672/');
-$client->connect();
+$message = Message::create('{"orderId": 123}')
+    ->withSubject('order.placed')
+    ->withContentType('application/json')
+    ->withMessageId('msg-abc-123')
+    ->withCorrelationId('order-123')
+    ->withApplicationProperty('source', 'checkout')
+    ->withTtl(30000)    // TTL in milliseconds
+    ->withDurable(true); // default is true
+```
+
+### Publishing with Properties (legacy constructor style)
+
+```php
+use AMQP10\Messaging\Message;
 
 $message = new Message(
     body: 'Hello, world!',
@@ -71,58 +121,123 @@ $message = new Message(
     priority: 8,
 );
 
-$client->publish('my-queue')->send($message);
+$client->publish('/queues/my-queue')->send($message);
+```
 
-$client->close();
+### Fire-and-Forget Publishing (Pre-settled)
+
+Pre-settled messages are sent without waiting for a broker disposition. This is the highest-throughput mode.
+
+```php
+use AMQP10\Messaging\Message;
+use Revolt\EventLoop;
+
+EventLoop::queue(function () use ($client) {
+    $client->publish('/exchanges/events')
+        ->fireAndForget()           // pre-settled, no disposition wait
+        ->send(Message::create($payload)->withSubject('order.placed'));
+});
+
+EventLoop::run();
 ```
 
 ### Consuming Messages
 
 ```php
-use AMQP10\Client\Client;
+use AMQP10\Messaging\Message;
+use AMQP10\Messaging\DeliveryContext;
+use Revolt\EventLoop;
 
-$client = new Client('amqp://guest:guest@localhost:5672/');
-$client->connect();
+EventLoop::queue(function () {
+    $client = new \AMQP10\Client\Client('amqp://guest:guest@localhost:5672');
+    $client->connect();
 
-$address = 'my-queue';
-$received = null;
+    $client->consume('/queues/my-queue')
+        ->handle(function (Message $msg, DeliveryContext $ctx) use ($client) {
+            echo "Received: " . $msg->body() . "\n";
 
-$client->consume($address)
-    ->credit(1)
-    ->handle(function ($msg, $ctx) use (&$received, $client) {
-        $received = $msg->body();
-        echo "Received: " . $msg->body() . "\n";
-        
-        // Access message properties
-        echo "Content-Type: " . $msg->property('content-type') . "\n";
-        echo "Correlation-ID: " . $msg->applicationProperty('correlation-id') . "\n";
-        
-        // Acknowledge or reject the message
-        $ctx->accept();
-        // OR
-        // $ctx->reject();
-        // OR
-        // $ctx->release();
-        
-        // Stop consuming after receiving one message
-        $client->close();
-    })
-    ->run();
+            // Access message properties
+            echo "Content-Type: " . $msg->property('content-type') . "\n";
+            echo "Source: " . $msg->applicationProperty('source') . "\n";
 
-echo "Final message: " . $received . "\n";
+            // Acknowledge the message
+            $ctx->accept();
+
+            // Stop consuming after one message
+            $client->close();
+        })
+        ->run();
+});
+
+EventLoop::run();
 ```
 
 ### Consuming with Prefetch
 
 ```php
-$client->consume('my-queue')
+$client->consume('/queues/my-queue')
     ->prefetch(10) // Allow up to 10 unacknowledged messages in flight
-    ->handle(function ($msg, $ctx) {
-        // Process message
+    ->handle(function (Message $msg, DeliveryContext $ctx) {
         processMessage($msg);
         $ctx->accept();
     })
     ->run();
+```
+
+### Durable Consumer (Survives Reconnect)
+
+A durable consumer with a stable link name will resume from where it left off after reconnection:
+
+```php
+use AMQP10\Messaging\Message;
+use AMQP10\Messaging\DeliveryContext;
+use AMQP10\Terminus\ExpiryPolicy;
+use AMQP10\Terminus\TerminusDurability;
+use Revolt\EventLoop;
+
+EventLoop::queue(function () use ($client) {
+    $client->consume('/queues/orders')
+        ->linkName('order-processor')                       // stable link name survives reconnect
+        ->durable(TerminusDurability::UnsettledState)
+        ->expiryPolicy(ExpiryPolicy::Never)
+        ->withReconnect(maxRetries: 10, backoffMs: 1000)
+        ->handle(function (Message $msg, DeliveryContext $ctx) {
+            // process message
+            $ctx->accept();
+        })
+        ->run();
+});
+
+EventLoop::run();
+```
+
+## Message Context
+
+When consuming messages, the delivery context provides methods to control message acknowledgment:
+
+```php
+$client->consume('/queues/my-queue')
+    ->handle(function (Message $msg, DeliveryContext $ctx) {
+        try {
+            processMessage($msg);
+            $ctx->accept();  // Acknowledge successful processing
+        } catch (\Exception $e) {
+            $ctx->release(); // Return message to queue for redelivery
+            // OR
+            // $ctx->reject(); // Reject without redelivery
+        }
+    })
+    ->run();
+```
+
+### Modified Outcome (Dead-lettering / Retry Elsewhere)
+
+```php
+// Retry on a different consumer (dead-letter on failure elsewhere)
+$ctx->modify(deliveryFailed: true, undeliverableHere: false); // retry elsewhere
+
+// Dead-letter the message
+$ctx->modify(deliveryFailed: true, undeliverableHere: true);  // dead-letter
 ```
 
 ## Management API
@@ -133,27 +248,32 @@ $client->consume('my-queue')
 use AMQP10\Client\Client;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
+use Revolt\EventLoop;
 
-$client = new Client('amqp://guest:guest@localhost:5672/');
-$client->connect();
+EventLoop::queue(function () {
+    $client = new Client('amqp://guest:guest@localhost:5672');
+    $client->connect();
 
-$mgmt = $client->management();
+    $mgmt = $client->management();
 
-// Declare a classic queue
-$spec = new QueueSpecification('my-queue', QueueType::CLASSIC);
-$mgmt->declareQueue($spec);
+    // Declare a classic queue
+    $spec = new QueueSpecification('my-queue', QueueType::CLASSIC);
+    $mgmt->declareQueue($spec);
 
-// Declare a queue with options
-$spec = new QueueSpecification(
-    name: 'my-durable-queue',
-    type: QueueType::QUORUM,
-);
-$mgmt->declareQueue($spec);
+    // Declare a quorum queue
+    $spec = new QueueSpecification(
+        name: 'my-durable-queue',
+        type: QueueType::QUORUM,
+    );
+    $mgmt->declareQueue($spec);
 
-// Delete a queue
-$mgmt->deleteQueue('my-queue');
+    // Delete a queue
+    $mgmt->deleteQueue('my-queue');
 
-$client->close();
+    $client->close();
+});
+
+EventLoop::run();
 ```
 
 ### Declare and Manage Exchanges
@@ -197,19 +317,6 @@ $mgmt->bind($binding);
 
 ## Advanced Configuration
 
-### Auto-Reconnect
-
-```php
-use AMQP10\Client\Client;
-
-$client = new Client('amqp://guest:guest@localhost:5672/')
-    ->withAutoReconnect(
-        maxRetries: 5,    // Maximum number of reconnection attempts
-        backoffMs: 1000,  // Delay between retries in milliseconds
-    )
-    ->connect();
-```
-
 ### Custom SASL Authentication
 
 ```php
@@ -227,25 +334,27 @@ $client = (new Client('amqp://localhost:5672/'))
     ->connect();
 ```
 
-### Consumer Configuration
+### Consumer Configuration Reference
 
 ```php
-$client->consume('my-queue')
+$client->consume('/queues/my-queue')
     ->credit(10)                  // Flow control credit (prefetch)
     ->prefetch(10)                // Alias for credit()
+    ->linkName('my-consumer')     // Stable link name for durable consumers
+    ->durable(TerminusDurability::UnsettledState) // Durable subscription
+    ->expiryPolicy(ExpiryPolicy::Never)           // Never expire the subscription
+    ->withReconnect(maxRetries: 10, backoffMs: 1000) // Reconnect on failure
     ->offset(Offset::offset(100))   // Start from offset 100 (stream queues only)
     // Filter methods:
     ->filterSql('priority > 5')          // RabbitMQ AMQP SQL (streams only) - shortcut for filterAmqpSql()
-    ->filterAmqpSql('priority > 5')       // RabbitMQ AMQP SQL (streams only) - explicit
-    ->filterJms('priority > 5')           // JMS SQL selector (ActiveMQ/Artemis only)
-    ->filterBloom('value')                // RabbitMQ Bloom filter (streams only)
+    ->filterAmqpSql('priority > 5')      // RabbitMQ AMQP SQL (streams only) - explicit
+    ->filterJms('priority > 5')          // JMS SQL selector (ActiveMQ/Artemis only)
+    ->filterBloom('value')               // RabbitMQ Bloom filter (streams only)
     ->filterBloom(['invoices', 'orders'], matchUnfiltered: true)  // Multiple values + match unfiltered
-    ->handle(function ($msg, $ctx) {
-        // Handle message
+    ->handle(function (Message $msg, DeliveryContext $ctx) {
         $ctx->accept();
     })
-    ->onError(function ($error) {
-        // Handle errors
+    ->onError(function (\Throwable $error) {
         error_log("Consumer error: " . $error->getMessage());
     })
     ->run();
@@ -289,38 +398,19 @@ $client->consume('my-queue')
 - Can combine with AMQP SQL filter for efficient 2-stage filtering
 - Reference: [RabbitMQ Stream Filtering - Stage 1: Bloom Filter](https://www.rabbitmq.com/docs/stream-filtering#stage-1-bloom-filter)
 
-## Message Context
-
-When consuming messages, the delivery context provides methods to control message acknowledgment:
-
-```php
-$client->consume('my-queue')
-    ->handle(function ($msg, $ctx) {
-        try {
-            processMessage($msg);
-            $ctx->accept(); // Acknowledge successful processing
-        } catch (\Exception $e) {
-            $ctx->release(); // Return message to queue for redelivery
-            // OR
-            // $ctx->reject(); // Reject without redelivery
-        }
-    })
-    ->run();
-```
-
 ## Address Format
 
-The library uses AMQP 1.0 address format:
+The library uses RabbitMQ AMQP 1.0 address format:
 
 ```php
 // Queue address
-$address = 'my-queue';
+$address = '/queues/my-queue';
 
-// Topic exchange
-$address = 'amq.topic/orders.created';
+// Topic exchange with routing key
+$address = '/exchanges/amq.topic/orders.created';
 
 // Custom exchange with routing key
-$address = 'my-exchange/routing-key';
+$address = '/exchanges/my-exchange/routing-key';
 ```
 
 ## Error Handling
@@ -329,20 +419,25 @@ $address = 'my-exchange/routing-key';
 use AMQP10\Client\Client;
 use AMQP10\Exception\AuthenticationException;
 use AMQP10\Exception\AmqpException;
+use AMQP10\Messaging\Message;
+use Revolt\EventLoop;
 
-try {
-    $client = new Client('amqp://guest:guest@localhost:5672/');
-    $client->connect();
-    
-    $client->publish('my-queue')->send(new Message('test'));
-    
-} catch (AuthenticationException $e) {
-    echo "Authentication failed: " . $e->getMessage() . "\n";
-} catch (AmqpException $e) {
-    echo "AMQP error: " . $e->getMessage() . "\n";
-} finally {
-    $client->close();
-}
+EventLoop::queue(function () {
+    $client = new Client('amqp://guest:guest@localhost:5672');
+
+    try {
+        $client->connect();
+        $client->publish('/queues/my-queue')->send(Message::create('test'));
+    } catch (AuthenticationException $e) {
+        echo "Authentication failed: " . $e->getMessage() . "\n";
+    } catch (AmqpException $e) {
+        echo "AMQP error: " . $e->getMessage() . "\n";
+    } finally {
+        $client->close();
+    }
+});
+
+EventLoop::run();
 ```
 
 ## Running Tests
