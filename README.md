@@ -114,7 +114,7 @@ $client->consume('/queues/my-queue')
         echo "Received: " . $msg->body() . "\n";
         $ctx->accept();
     })
-    ->stopOnSignal(SIGINT, SIGTERM)  // Ctrl+C stops cleanly after current message
+    ->stopOnSignal([SIGINT, SIGTERM])  // Ctrl+C stops cleanly after current message
     ->run();                          // blocks here
 
 $client->close();
@@ -125,7 +125,7 @@ The optional second argument to `stopOnSignal()` is a callback fired when the si
 ```php
 $client->consume('/queues/my-queue')
     ->handle(fn(Message $msg, DeliveryContext $ctx) => $ctx->accept())
-    ->stopOnSignal(SIGINT, SIGTERM, function (int $signal) use ($output) {
+    ->stopOnSignal([SIGINT, SIGTERM], function (int $signal) use ($output) {
         $output->writeln('<comment>Signal ' . $signal . ' received, finishing current message...</comment>');
     })
     ->run();
@@ -163,7 +163,7 @@ $client->consume('/queues/orders')
         // process message
         $ctx->accept();
     })
-    ->stopOnSignal(SIGINT, SIGTERM)
+    ->stopOnSignal([SIGINT, SIGTERM])
     ->run();
 ```
 
@@ -204,32 +204,27 @@ $ctx->modify(deliveryFailed: true, undeliverableHere: true);  // dead-letter
 use AMQP10\Client\Client;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
-use Revolt\EventLoop;
 
-EventLoop::queue(function () {
-    $client = new Client('amqp://guest:guest@localhost:5672');
-    $client->connect();
+$client = new Client('amqp://guest:guest@localhost:5672');
+$client->connect();
 
-    $mgmt = $client->management();
+$mgmt = $client->management();
 
-    // Declare a classic queue
-    $spec = new QueueSpecification('my-queue', QueueType::CLASSIC);
-    $mgmt->declareQueue($spec);
+// Declare a classic queue
+$spec = new QueueSpecification('my-queue', QueueType::CLASSIC);
+$mgmt->declareQueue($spec);
 
-    // Declare a quorum queue
-    $spec = new QueueSpecification(
-        name: 'my-durable-queue',
-        type: QueueType::QUORUM,
-    );
-    $mgmt->declareQueue($spec);
+// Declare a quorum queue
+$spec = new QueueSpecification(
+    name: 'my-durable-queue',
+    type: QueueType::QUORUM,
+);
+$mgmt->declareQueue($spec);
 
-    // Delete a queue
-    $mgmt->deleteQueue('my-queue');
+// Delete a queue
+$mgmt->deleteQueue('my-queue');
 
-    $client->close();
-});
-
-EventLoop::run();
+$client->close();
 ```
 
 ### Declare and Manage Exchanges
@@ -264,8 +259,8 @@ use AMQP10\Management\BindingSpecification;
 $mgmt = $client->management();
 
 $binding = new BindingSpecification(
-    source: 'my-exchange',
-    destination: 'my-queue',
+    sourceExchange: 'my-exchange',
+    destinationQueue: 'my-queue',
     bindingKey: 'routing-key',
 );
 $mgmt->bind($binding);
@@ -313,8 +308,8 @@ $client->consume('/queues/my-queue')
     ->onError(function (\Throwable $error) {
         error_log("Consumer error: " . $error->getMessage());
     })
-    ->stopOnSignal(SIGINT, SIGTERM)                      // Graceful shutdown on signal (requires ext-pcntl)
-    ->stopOnSignal(SIGINT, fn(int $sig) => log($sig))    // With custom callback
+    ->stopOnSignal([SIGINT, SIGTERM])                     // Graceful shutdown on signal (requires ext-pcntl)
+    ->stopOnSignal([SIGINT, SIGTERM], fn(int $sig) => log($sig))  // With custom callback
     ->run();
 ```
 

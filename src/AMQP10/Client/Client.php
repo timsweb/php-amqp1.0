@@ -19,6 +19,7 @@ class Client
     /** @phpstan-ignore-next-line */
     private ?TransportInterface $activeTransport   = null;
     private ?string             $heartbeatTimerId  = null;
+    private ?Management         $management        = null;
 
     public function __construct(
         private readonly string $uri,
@@ -69,7 +70,7 @@ class Client
 
     public function reconnect(): static
     {
-        $this->cancelHeartbeat();
+        $this->management = null;
         $this->close();
         return $this->connect();
     }
@@ -77,6 +78,8 @@ class Client
     public function close(): void
     {
         $this->cancelHeartbeat();
+        $this->management?->close();
+        $this->management      = null;
         $this->session?->end();
         $this->connection?->close();
         $this->connection      = null;
@@ -145,7 +148,10 @@ class Client
 
     public function management(): Management
     {
-        return new Management($this->session(), $this->config->timeout);
+        if ($this->management === null) {
+            $this->management = new Management($this->session(), $this->config->timeout);
+        }
+        return $this->management;
     }
 
     public function session(): Session
