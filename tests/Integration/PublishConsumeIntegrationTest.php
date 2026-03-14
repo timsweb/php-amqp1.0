@@ -8,7 +8,7 @@ use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
 use AMQP10\Messaging\Message;
 
-class PublishConsumeIntegrationTest extends IntegrationTestCase
+class PublishConsumeIntegrationTest extends RabbitMqTestCase
 {
     private string $queueName = 'integ-publish-consume';
 

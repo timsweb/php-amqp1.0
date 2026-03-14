@@ -9,7 +9,7 @@ use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
 use AMQP10\Management\BindingSpecification;
 
-class ManagementIntegrationTest extends IntegrationTestCase
+class ManagementIntegrationTest extends RabbitMqTestCase
 {
     public function test_declare_and_delete_queue(): void
     {

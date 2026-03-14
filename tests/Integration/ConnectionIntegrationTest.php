@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace AMQP10\Tests\Integration;
 
-class ConnectionIntegrationTest extends IntegrationTestCase
+class ConnectionIntegrationTest extends RabbitMqTestCase
 {
     public function test_can_connect_and_disconnect(): void
     {

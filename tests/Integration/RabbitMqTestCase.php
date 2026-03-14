@@ -66,6 +66,26 @@ abstract class RabbitMqTestCase extends TestCase
     }
 
     /**
+     * Run a test body inside the Revolt event loop.
+     * All RevoltTransport operations (connect, read, send) require an event loop context.
+     */
+    protected function runInEventLoop(\Closure $fn): void
+    {
+        $exception = null;
+        \Revolt\EventLoop::queue(function () use ($fn, &$exception): void {
+            try {
+                $fn();
+            } catch (\Throwable $e) {
+                $exception = $e;
+            }
+        });
+        \Revolt\EventLoop::run();
+        if ($exception !== null) {
+            throw $exception;
+        }
+    }
+
+    /**
      * Find an available TCP port on the loopback interface.
      */
     private static function findFreePort(): int

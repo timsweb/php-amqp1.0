@@ -9,7 +9,7 @@ use AMQP10\Management\QueueType;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\Offset;
 
-class StreamFilterIntegrationTest extends IntegrationTestCase
+class StreamFilterIntegrationTest extends RabbitMqTestCase
 {
     private string $queueName = 'integ-stream-filter';
 
