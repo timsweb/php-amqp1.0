@@ -59,6 +59,9 @@ class Client
                     }
                 }
             );
+            // Unreference so the heartbeat doesn't prevent the event loop from stopping
+            // when there's no other work to do (e.g. after a one-shot publish).
+            \Revolt\EventLoop::unreference($this->heartbeatTimerId);
         }
 
         return $this;
