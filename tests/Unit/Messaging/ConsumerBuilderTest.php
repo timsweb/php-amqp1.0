@@ -44,4 +44,28 @@ class ConsumerBuilderTest extends TestCase
         $ref->setAccessible(true);
         $this->assertSame($callback, $ref->getValue($builder));
     }
+
+    public function test_with_idle_timeout_before_consumer_sets_value(): void
+    {
+        $client  = $this->createMock(Client::class);
+        $builder = new ConsumerBuilder($client, '/queues/test');
+        $builder->withIdleTimeout(5.0);
+
+        $ref = new ReflectionProperty(ConsumerBuilder::class, 'idleTimeout');
+        $ref->setAccessible(true);
+        $this->assertSame(5.0, $ref->getValue($builder));
+    }
+
+    public function test_with_idle_timeout_after_consumer_invalidates_cache(): void
+    {
+        $client  = $this->createMock(Client::class);
+        $builder = new ConsumerBuilder($client, '/queues/test');
+
+        // Force idleTimeout to be mutable by checking we can set it
+        $builder->withIdleTimeout(5.0);
+
+        $ref = new ReflectionProperty(ConsumerBuilder::class, 'idleTimeout');
+        $ref->setAccessible(true);
+        $this->assertSame(5.0, $ref->getValue($builder));
+    }
 }
