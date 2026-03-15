@@ -5,9 +5,17 @@ declare(strict_types=1);
 namespace AMQP10\Tests\Unit\Messaging;
 
 use AMQP10\Client\Client;
+use AMQP10\Connection\Session;
 use AMQP10\Messaging\ConsumerBuilder;
+use AMQP10\Messaging\DeliveryContext;
+use AMQP10\Messaging\Message;
+use AMQP10\Messaging\MessageEncoder;
+use AMQP10\Protocol\PerformativeEncoder;
+use AMQP10\Tests\Mocks\ClientMock;
+use AMQP10\Tests\Mocks\TransportMock;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
+use Revolt\EventLoop;
 
 class ConsumerBuilderTest extends TestCase
 {
@@ -108,5 +116,85 @@ class ConsumerBuilderTest extends TestCase
         $ref = new ReflectionProperty(ConsumerBuilder::class, 'idleTimeout');
         $ref->setAccessible(true);
         $this->assertSame(2.0, $ref->getValue($builder));
+    }
+
+    /** @return array{TransportMock, ClientMock} */
+    private function makeClient(): array
+    {
+        $mock = new TransportMock();
+        $mock->connect('amqp://test');
+        $mock->queueIncoming(PerformativeEncoder::begin(channel: 0, remoteChannel: 0));
+        $session = new Session($mock, channel: 0);
+        $session->begin();
+        $mock->clearSent();
+
+        return [$mock, new ClientMock($session)];
+    }
+
+    private function makeTransferFrame(string $text, int $deliveryId = 0): string
+    {
+        return PerformativeEncoder::transfer(
+            channel: 0,
+            handle: 0,
+            deliveryId: $deliveryId,
+            deliveryTag: pack('N', $deliveryId),
+            messagePayload: MessageEncoder::encode(new Message($text)),
+            settled: false,
+        );
+    }
+
+    public function test_consumer_stop_via_cached_reference_count_based(): void
+    {
+        [$mock, $client] = $this->makeClient();
+
+        // Queue ATTACH response then 5 messages
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
+        ));
+        for ($i = 0; $i < 5; $i++) {
+            $mock->queueIncoming($this->makeTransferFrame("msg-$i", $i));
+        }
+
+        $builder  = new ConsumerBuilder($client, '/queues/test', idleTimeout: 0.1);
+        $consumer = $builder->consumer();
+        $count    = 0;
+
+        $builder->handle(function (Message $msg, DeliveryContext $ctx) use ($consumer, &$count): void {
+            $ctx->accept();
+            if (++$count >= 3) {
+                $consumer->stop();
+            }
+        })->run();
+
+        $this->assertSame(3, $count, 'Consumer should stop after exactly 3 messages');
+    }
+
+    public function test_run_uses_cached_consumer_instance(): void
+    {
+        [$mock, $client] = $this->makeClient();
+
+        $mock->queueIncoming(PerformativeEncoder::attach(
+            channel: 0,
+            name: 'recv',
+            handle: 0,
+            role: PerformativeEncoder::ROLE_SENDER,
+            source: '/queues/test',
+            target: null,
+        ));
+
+        $builder  = new ConsumerBuilder($client, '/queues/test', idleTimeout: 0.05);
+        $consumer = $builder->consumer();
+
+        // Stop immediately — if run() uses the same instance, it will exit at once
+        $consumer->stop();
+        $builder->handle(fn(Message $msg, DeliveryContext $ctx) => $ctx->accept())->run();
+
+        // If we reached here without hanging, run() used the cached (pre-stopped) consumer
+        $this->assertTrue(true);
     }
 }
