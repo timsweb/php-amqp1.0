@@ -10,6 +10,7 @@ Provide a set of runnable, copy-paste-friendly PHP scripts covering all major us
 ## Constraints
 
 - PHP 8.2+, requires a live RabbitMQ 4.0+ broker
+- Examples use `QueueType::QUORUM` as the default queue type (RabbitMQ's recommended choice); `QueueType::STREAM` where stream-specific features are demonstrated; `management/01-declare-queue.php` intentionally shows all three types
 - Scripts default to `amqp://guest:guest@localhost`; overridable via `AMQP_URI` env var
 - Each script is self-contained: it declares any queues/exchanges it needs, runs its demonstration, then cleans up
 - Run from CLI: `php examples/publishing/01-basic-publish.php`
@@ -59,7 +60,7 @@ All scripts open with `require __DIR__ . '/../bootstrap.php'` (all scripts are e
 ### publishing/
 
 **01-basic-publish.php**
-Declare a classic queue via management. Publish one message. Assert `$outcome->isAccepted()`. Delete queue.
+Declare a quorum queue via management. Publish one message. Assert `$outcome->isAccepted()`. Delete queue.
 
 **02-fire-and-forget.php**
 Same flow but using `->fireAndForget()` on the publisher builder. Comment explains the trade-off: no disposition wait, higher throughput, no delivery guarantee.
@@ -70,13 +71,13 @@ Publish a message built with `withMessageId()`, `withCorrelationId()`, `withAppl
 ### consuming/
 
 **01-run-loop.php**
-Declare a classic queue. Publish 3 messages. Materialise the consumer with `->withIdleTimeout(2.0)->credit(3)->consumer()`. Use a counter inside the handler: call `$ctx->accept()` on each delivery, and after all 3 have been processed call `$consumer->stop()` so `run()` returns cleanly. Contrast `$ctx->accept()` with `$ctx->reject()` in a comment. Delete queue after run completes. Note: without an explicit `stop()` call, `run()` will block until `idleTimeout` expires after the last message.
+Declare a quorum queue. Publish 3 messages. Materialise the consumer with `->withIdleTimeout(2.0)->credit(3)->consumer()`. Use a counter inside the handler: call `$ctx->accept()` on each delivery, and after all 3 have been processed call `$consumer->stop()` so `run()` returns cleanly. Contrast `$ctx->accept()` with `$ctx->reject()` in a comment. Delete queue after run completes. Note: without an explicit `stop()` call, `run()` will block until `idleTimeout` expires after the last message.
 
 **02-one-shot.php**
-Declare a classic queue. Publish 1 message. Use `->consumer()->receive()` to pull a single `Delivery`. Call `$delivery->context()->accept()` to acknowledge, then call `$consumer->close()` to detach the link. Delete the queue and call `$client->close()`.
+Declare a quorum queue. Publish 1 message. Use `->consumer()->receive()` to pull a single `Delivery`. Call `$delivery->context()->accept()` to acknowledge, then call `$consumer->close()` to detach the link. Delete the queue and call `$client->close()`.
 
 **03-batched-consumer.php**
-Declare a classic queue. Publish 20 messages. Materialise the consumer with `->withIdleTimeout(1.0)->credit(20)->consumer()`. `withIdleTimeout(1.0)` controls the per-`receive()` blocking window (each call waits at most 1 second for a frame before returning `null`). Separately, a 5-second wall-clock deadline is tracked with `microtime(true)` in the outer loop. In a manual loop call `$consumer->receive()` to fill a buffer of up to 10 messages or until the wall-clock deadline is reached. Process the batch, call `$ctx->accept()` on each, then repeat until the queue is drained. `Consumer::run()` is NOT used here — the manual `receive()` loop is the pattern. Delete queue and close.
+Declare a quorum queue. Publish 20 messages. Materialise the consumer with `->withIdleTimeout(1.0)->credit(20)->consumer()`. `withIdleTimeout(1.0)` controls the per-`receive()` blocking window (each call waits at most 1 second for a frame before returning `null`). Separately, a 5-second wall-clock deadline is tracked with `microtime(true)` in the outer loop. In a manual loop call `$consumer->receive()` to fill a buffer of up to 10 messages or until the wall-clock deadline is reached. Process the batch, call `$ctx->accept()` on each, then repeat until the queue is drained. `Consumer::run()` is NOT used here — the manual `receive()` loop is the pattern. Delete queue and close.
 
 **04-stop-on-signal.php**
 Long-running consumer (no pre-seeded messages). Requires `ext-pcntl`. Register `stopOnSignal([SIGINT, SIGTERM], fn(int $signal) => print("Caught signal $signal, shutting down\n"))`. The closure receives the signal number as its only argument. Demonstrates graceful shutdown on `Ctrl+C`.
@@ -101,10 +102,10 @@ Declare a stream queue. Publish messages setting a filter value annotation via `
 ### management/
 
 **01-declare-queue.php**
-Declare a classic queue, a quorum queue, and a stream queue using `QueueSpecification` and `QueueType`. Delete all three at the end.
+Declare a quorum queue, a stream queue, and a classic queue using `QueueSpecification` and `QueueType`. Demonstrates all three `QueueType` values. Delete all three at the end.
 
 **02-declare-exchange-and-bind.php**
-Declare a direct exchange. Declare a classic queue. Bind the queue to the exchange with a routing key using `BindingSpecification`. Delete exchange and queue at the end.
+Declare a direct exchange. Declare a quorum queue. Bind the queue to the exchange with a routing key using `BindingSpecification`. Delete exchange and queue at the end.
 
 **03-delete.php**
 Standalone example of `deleteQueue()` and `deleteExchange()`. Catch `QueueNotFoundException` and `ExchangeNotFoundException` to demonstrate handling missing-resource errors.
@@ -125,7 +126,7 @@ Each script that needs broker resources follows this pattern:
 // Setup — management link opened, queue/exchange declared, then closed to free the link
 $client = (new Client(AMQP_URI))->connect();
 $mgmt = $client->management();
-$mgmt->declareQueue(new QueueSpecification('example-queue', QueueType::CLASSIC));
+$mgmt->declareQueue(new QueueSpecification('example-queue', QueueType::QUORUM));
 $mgmt->close(); // closes the management link; $client stays open
 
 // ... demonstration code ...
