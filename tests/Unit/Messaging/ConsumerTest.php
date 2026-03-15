@@ -7,8 +7,7 @@ namespace AMQP10\Tests\Messaging;
 use AMQP10\Connection\Session;
 use AMQP10\Messaging\Consumer;
 use AMQP10\Messaging\ConsumerBuilder;
-use AMQP10\Messaging\Delivery;
-use AMQP10\Messaging\DeliveryContext;
+use AMQP10\Messaging\InboundMessage;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\MessageEncoder;
 use AMQP10\Messaging\Offset;
@@ -57,7 +56,7 @@ class ConsumerTest extends TestCase
         );
     }
 
-    public function test_consumer_calls_handler_with_message_and_delivery_context(): void
+    public function test_consumer_calls_handler_with_inbound_message(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
@@ -72,18 +71,18 @@ class ConsumerTest extends TestCase
         $mock->queueIncoming($this->makeTransferFrame(0, 'hello', deliveryId: 0));
 
         $received = [];
-        $contexts = [];
+        $msgs = [];
 
         $consumer = new Consumer($client, '/queues/test', credit: 1);
-        $consumer->run(function (Message $msg, DeliveryContext $ctx) use (&$received, &$contexts, $mock) {
+        $consumer->run(function (InboundMessage $msg) use (&$received, &$msgs, $mock) {
             $received[] = $msg->body();
-            $contexts[] = $ctx;
+            $msgs[] = $msg;
             $mock->disconnect();
         });
 
         $this->assertCount(1, $received);
         $this->assertSame('hello', $received[0]);
-        $this->assertInstanceOf(DeliveryContext::class, $contexts[0]);
+        $this->assertInstanceOf(InboundMessage::class, $msgs[0]);
     }
 
     public function test_consumer_sends_attach_and_flow_frames(): void
@@ -138,7 +137,7 @@ class ConsumerTest extends TestCase
         $count = 0;
 
         $consumer = new Consumer($client, '/queues/test', credit: 10);
-        $consumer->run(function (Message $msg, DeliveryContext $ctx) use (&$received, &$count, $mock) {
+        $consumer->run(function (InboundMessage $msg) use (&$received, &$count, $mock) {
             $received[] = $msg->body();
             $count++;
             if ($count >= 2) {
@@ -167,7 +166,7 @@ class ConsumerTest extends TestCase
 
         $consumer = new Consumer($client, '/queues/test', credit: 1);
         $consumer->run(
-            function (Message $msg, DeliveryContext $ctx) use ($mock) {
+            function (InboundMessage $msg) use ($mock) {
                 $mock->disconnect();
                 throw new RuntimeException('handler failed');
             },
@@ -195,7 +194,7 @@ class ConsumerTest extends TestCase
 
         $called = false;
         $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 0.05);
-        $consumer->run(function (Message $msg) use (&$called) {
+        $consumer->run(function (InboundMessage $msg) use (&$called) {
             $called = true;
         });
 
@@ -221,7 +220,7 @@ class ConsumerTest extends TestCase
         $builder = new ConsumerBuilder($client, '/queues/test');
         $builder
             ->credit(5)
-            ->handle(function (Message $msg, DeliveryContext $ctx) use (&$received, $mock) {
+            ->handle(function (InboundMessage $msg) use (&$received, $mock) {
                 $received[] = $msg->body();
                 $mock->disconnect();
             })
@@ -392,7 +391,7 @@ class ConsumerTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function test_receive_returns_delivery(): void
+    public function test_receive_returns_inbound_message(): void
     {
         [$mock, $session, $client] = $this->makeClient();
 
@@ -407,12 +406,11 @@ class ConsumerTest extends TestCase
         $mock->queueIncoming($this->makeTransferFrame(0, 'hello', deliveryId: 0));
 
         $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 0.05);
-        $delivery = $consumer->receive();
+        $msg = $consumer->receive();
 
-        $this->assertNotNull($delivery);
-        $this->assertInstanceOf(Delivery::class, $delivery);
-        $this->assertSame('hello', $delivery->message()->body());
-        $this->assertInstanceOf(DeliveryContext::class, $delivery->context());
+        $this->assertNotNull($msg);
+        $this->assertInstanceOf(InboundMessage::class, $msg);
+        $this->assertSame('hello', $msg->body());
 
         $consumer->close();
     }
@@ -456,8 +454,8 @@ class ConsumerTest extends TestCase
         $d1 = $consumer->receive();
         $d2 = $consumer->receive();
 
-        $this->assertSame('first', $d1->message()->body());
-        $this->assertSame('second', $d2->message()->body());
+        $this->assertSame('first', $d1->body());
+        $this->assertSame('second', $d2->body());
         $consumer->close();
     }
 
@@ -480,7 +478,7 @@ class ConsumerTest extends TestCase
         $delivery = $consumer->receive();
 
         $this->assertNotNull($delivery);
-        $this->assertSame('via-builder', $delivery->message()->body());
+        $this->assertSame('via-builder', $delivery->body());
         $consumer->close();
     }
 
@@ -500,7 +498,7 @@ class ConsumerTest extends TestCase
 
         $called = false;
         $consumer = new Consumer($client, '/queues/test', credit: 1, idleTimeout: 0.05);
-        $consumer->run(function (Message $msg) use (&$called) {
+        $consumer->run(function (InboundMessage $msg) use (&$called) {
             $called = true;
         });
 
@@ -727,7 +725,7 @@ class ConsumerTest extends TestCase
 
         $count = 0;
         $consumer = new Consumer($client, '/queues/test', credit: 4);
-        $consumer->run(function (Message $msg) use (&$count, $mock) {
+        $consumer->run(function (InboundMessage $msg) use (&$count, $mock) {
             $count++;
             if ($count >= 5) {
                 $mock->disconnect();

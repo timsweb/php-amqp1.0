@@ -89,7 +89,7 @@ class Consumer
         $this->stopRequested = false;
     }
 
-    public function receive(): ?Delivery
+    public function receive(): ?InboundMessage
     {
         $this->ensureAttached();
 
@@ -123,6 +123,7 @@ class Consumer
             }
 
             $this->received++;
+            assert($this->link !== null);
             if ($replenish > 0 && $this->received % $replenish === 0) {
                 $this->link->grantCredit((int) ceil($this->credit / 2), $this->received);
             }
@@ -131,7 +132,7 @@ class Consumer
         }
     }
 
-    private function handleTransferFrame(string $frame): ?Delivery
+    private function handleTransferFrame(string $frame): ?InboundMessage
     {
         $body = FrameParser::extractBody($frame);
         $decoder = new TypeDecoder($body);
@@ -153,9 +154,10 @@ class Consumer
         }
 
         $message = MessageDecoder::decode($msgPayload);
+        assert($this->link !== null);
         $ctx = new DeliveryContext($deliveryId, $this->link);
 
-        return new Delivery($message, $ctx);
+        return new InboundMessage($message, $ctx);
     }
 
     public function run(?Closure $handler, ?Closure $errorHandler = null): void
@@ -166,7 +168,7 @@ class Consumer
                 while ($delivery = $this->receive()) {
                     if ($handler !== null) {
                         try {
-                            $handler($delivery->message(), $delivery->context());
+                            $handler($delivery);
                         } catch (Throwable $e) {
                             if ($errorHandler !== null) {
                                 $errorHandler($e);
