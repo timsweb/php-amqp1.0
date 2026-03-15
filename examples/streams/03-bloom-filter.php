@@ -59,8 +59,8 @@ while (true) {
         break;
     }
     $received++;
-    echo "  Received: " . $delivery->message()->body() . "\n";
-    $delivery->context()->accept();
+    echo "  Received: " . $delivery->body() . "\n";
+    $delivery->accept();
 }
 
 echo "Total received: $received (expected 3)\n";

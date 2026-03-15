@@ -51,8 +51,8 @@ $consumer = $client->consume($streamAddress)
 for ($i = 0; $i < 3; $i++) {
     $delivery = $consumer->receive();
     if ($delivery !== null) {
-        echo "  Received: " . $delivery->message()->body() . "\n";
-        $delivery->context()->accept();
+        echo "  Received: " . $delivery->body() . "\n";
+        $delivery->accept();
     }
 }
 $consumer->close();
@@ -79,8 +79,8 @@ while (true) {
         break;
     }
     $received++;
-    echo "  Resumed: " . $delivery->message()->body() . "\n";
-    $delivery->context()->accept();
+    echo "  Resumed: " . $delivery->body() . "\n";
+    $delivery->accept();
 }
 
 echo "Resumed and received $received more messages\n";

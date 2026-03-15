@@ -8,7 +8,7 @@ use AMQP10\Address\AddressHelper;
 use AMQP10\Client\Client;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
-use AMQP10\Messaging\Delivery;
+use AMQP10\Messaging\InboundMessage;
 use AMQP10\Messaging\Message;
 
 $client = (new Client(AMQP_URI))->connect();
@@ -48,7 +48,7 @@ $consumer = $client->consume($address)
     ->consumer();
 
 while ($processed < $total) {
-    /** @var Delivery[] $batch */
+    /** @var InboundMessage[] $batch */
     $batch = [];
     $batchDeadline = microtime(true) + $batchWindowSecs;
 
@@ -68,8 +68,8 @@ while ($processed < $total) {
     echo "Batch $batchNum: processing " . count($batch) . " messages\n";
 
     foreach ($batch as $delivery) {
-        echo "  -> " . $delivery->message()->body() . "\n";
-        $delivery->context()->accept();
+        echo "  -> " . $delivery->body() . "\n";
+        $delivery->accept();
         $processed++;
     }
 }

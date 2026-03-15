@@ -42,8 +42,8 @@ $consumer = $client->consume($queueAddress)->withIdleTimeout(5.0)->credit(1)->co
 $delivery = $consumer->receive();
 
 if ($delivery !== null) {
-    echo "Received via exchange routing: " . $delivery->message()->body() . "\n";
-    $delivery->context()->accept();
+    echo "Received via exchange routing: " . $delivery->body() . "\n";
+    $delivery->accept();
 }
 $consumer->close();
 

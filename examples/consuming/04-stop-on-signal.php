@@ -8,8 +8,7 @@ use AMQP10\Address\AddressHelper;
 use AMQP10\Client\Client;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
-use AMQP10\Messaging\DeliveryContext;
-use AMQP10\Messaging\Message;
+use AMQP10\Messaging\InboundMessage;
 
 // Requires ext-pcntl for signal handling. Without it, stopOnSignal() is a no-op
 // and the consumer will run until stopped by other means.
@@ -34,10 +33,10 @@ echo "Consumer running. Publish a message to the queue, or press Ctrl+C to stop.
 // use it for logging, cleanup, or status output before shutdown.
 $client->consume($address)
     ->withIdleTimeout(1.0)
-    ->handle(function (Message $message, DeliveryContext $ctx) use (&$received): void {
+    ->handle(function (InboundMessage $msg) use (&$received): void {
         $received++;
-        echo "Received ($received): " . $message->body() . "\n";
-        $ctx->accept();
+        echo "Received ($received): " . $msg->body() . "\n";
+        $msg->accept();
     })
     ->stopOnSignal(
         [SIGINT, SIGTERM],

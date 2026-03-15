@@ -49,7 +49,7 @@ if ($delivery !== null) {
     echo "tenant:         " . $msg->applicationProperty('tenant') . "\n";
     echo "region:         " . $msg->applicationProperty('region') . "\n";
     echo "body:           " . $msg->body() . "\n";
-    $delivery->context()->accept();
+    $delivery->accept();
 }
 
 $consumer->close();

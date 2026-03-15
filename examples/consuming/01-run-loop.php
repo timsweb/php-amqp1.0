@@ -8,7 +8,7 @@ use AMQP10\Address\AddressHelper;
 use AMQP10\Client\Client;
 use AMQP10\Management\QueueSpecification;
 use AMQP10\Management\QueueType;
-use AMQP10\Messaging\DeliveryContext;
+use AMQP10\Messaging\InboundMessage;
 use AMQP10\Messaging\Message;
 
 $client = (new Client(AMQP_URI))->connect();
@@ -30,9 +30,9 @@ echo "Published $total messages\n";
 
 // Consume using run() with a handler closure.
 //
-// The handler receives (Message $message, DeliveryContext $ctx) — not a Delivery object.
-// Call $ctx->accept() to acknowledge the delivery.
-// Call $ctx->reject() instead to send the message to the dead-letter exchange.
+// The handler receives InboundMessage — message data and settlement in one object.
+// Call $msg->accept() to acknowledge the delivery.
+// Call $msg->reject() instead to send the message to the dead-letter exchange.
 //
 // run() loops until receive() returns null (idle timeout, stop(), or disconnect).
 // Without an explicit stop() call it will block for the full idleTimeout after the
@@ -44,11 +44,11 @@ $consumer = $client->consume($address)
     ->consumer();
 
 $consumer->run(
-    function (Message $message, DeliveryContext $ctx) use (&$count, $total, $consumer): void {
+    function (InboundMessage $msg) use (&$count, $total, $consumer): void {
         $count++;
-        echo "Received ($count/$total): " . $message->body() . "\n";
-        $ctx->accept();
-        // $ctx->reject(); // nack — routes to dead-letter exchange
+        echo "Received ($count/$total): " . $msg->body() . "\n";
+        $msg->accept();
+        // $msg->reject(); // nack — routes to dead-letter exchange
 
         if ($count >= $total) {
             $consumer->stop();

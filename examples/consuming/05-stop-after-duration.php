@@ -47,8 +47,8 @@ while (microtime(true) < $deadline) {
         continue; // idle timeout — loop back and re-check wall-clock
     }
     $received++;
-    echo "Received ($received): " . $delivery->message()->body() . "\n";
-    $delivery->context()->accept();
+    echo "Received ($received): " . $delivery->body() . "\n";
+    $delivery->accept();
 }
 
 echo "Duration elapsed. Total received: $received\n";
