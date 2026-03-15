@@ -216,9 +216,10 @@ New unit tests in `ConsumerBuilderTest`:
 1. `consumer()` returns the same instance on repeated calls.
 2. `run()` uses the cached instance from a prior `consumer()` call.
 3. Calling a builder setter (e.g. `credit()`) after `consumer()` does not affect the cached instance.
-4. `withIdleTimeout()` after `consumer()` invalidates the cache — the next `consumer()` call returns a fresh instance.
-5. Count-based stop: consumer stops after exactly N messages using a reference obtained via `consumer()`.
-6. Time-based stop simulation: `EventLoop::delay()` fires and calls `stop()`; `run()` returns; delayed timer is cancelled cleanly.
+4. `withIdleTimeout()` called *before* `consumer()` propagates the value to the constructed consumer (verify via reflection).
+5. `withIdleTimeout()` called *after* `consumer()` invalidates the cache — the next `consumer()` call returns a fresh instance with the new timeout.
+6. Count-based stop: consumer stops after exactly N messages using a reference obtained via `consumer()`.
+7. Time-based stop simulation: `EventLoop::delay()` fires and calls `stop()`; `run()` returns; delayed timer is cancelled cleanly.
 
 ---
 
@@ -226,6 +227,6 @@ New unit tests in `ConsumerBuilderTest`:
 
 | File | Change |
 |------|--------|
-| `src/AMQP10/Messaging/ConsumerBuilder.php` | Add `$cachedConsumer`; update `consumer()` to cache; add `withIdleTimeout()` |
+| `src/AMQP10/Messaging/ConsumerBuilder.php` | Add `$cachedConsumer`; update `consumer()` to cache; add `withIdleTimeout()`; remove `readonly` from `$idleTimeout` constructor parameter |
 | `tests/Unit/Messaging/ConsumerBuilderTest.php` | New tests per above |
 | `README.md` | Add "Consumer Stop Control" section documenting the patterns |
