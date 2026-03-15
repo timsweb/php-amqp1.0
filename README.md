@@ -167,6 +167,88 @@ $client->consume('/queues/orders')
     ->run();
 ```
 
+### Consumer Stop Control
+
+For advanced termination patterns — stop after N messages, time-based restart, or an
+external flag — obtain the `Consumer` reference before calling `run()`:
+
+```php
+$builder  = $client->consume('/queues/events')->handle($this->handleMessage(...));
+$consumer = $builder->consumer(); // same instance run() will use
+$builder->run();                  // blocks
+```
+
+#### Class-based worker — stop from handler
+
+```php
+class PopularityWorker
+{
+    private Consumer $consumer;
+    private int $count = 0;
+
+    public function run(Client $client): void
+    {
+        $builder = $client->consume('/queues/popularity-updates')
+            ->handle($this->handle(...))
+            ->stopOnSignal([SIGINT, SIGTERM]);
+
+        $this->consumer = $builder->consumer();
+        $builder->run();
+    }
+
+    private function handle(Message $msg, DeliveryContext $ctx): void
+    {
+        $ctx->accept();
+        if (++$this->count >= 1000) {
+            $this->consumer->stop();
+        }
+    }
+}
+```
+
+#### Time-based — Revolt delay
+
+```php
+$builder  = $client->consume('/queues/events')->handle($handler);
+$consumer = $builder->consumer();
+
+$timerId = EventLoop::delay(3600.0, fn() => $consumer->stop());
+$builder->run(); // blocks
+EventLoop::cancel($timerId); // cancel if consumer exited before timer fired
+```
+
+> `EventLoop::delay()` is a referenced watcher. Without the `cancel()` after `run()` returns,
+> a consumer that exits before the timer fires would keep the event loop alive for the
+> remaining duration.
+
+#### External flag — unreferenced repeat
+
+```php
+$builder  = $client->consume('/queues/events')->handle($handler);
+$consumer = $builder->consumer();
+
+$watcherId = EventLoop::repeat(5.0, function () use ($consumer, &$watcherId): void {
+    if (shouldRestart()) {
+        $consumer->stop();
+        EventLoop::cancel($watcherId);
+    }
+});
+EventLoop::unreference($watcherId); // won't prevent loop exit when consumer stops
+$builder->run();
+```
+
+#### Idle timeout
+
+By default the consumer waits up to 30 seconds for a message before `receive()` returns.
+For tighter stop-signal responsiveness, reduce this:
+
+```php
+$client->consume('/queues/events')
+    ->withIdleTimeout(5.0)
+    ->handle($handler)
+    ->run();
+```
+
 ## Message Context
 
 When consuming messages, the delivery context provides methods to control message acknowledgment:
