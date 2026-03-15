@@ -160,7 +160,9 @@ class Connection
     {
         // Need at least 4 bytes for the size field
         $this->fillBuffer(4);
-        $size = unpack('N', substr($this->buffer, 0, 4))[1];
+        $sizeUnpacked = unpack('N', substr($this->buffer, 0, 4));
+        assert(is_array($sizeUnpacked));
+        $size = $sizeUnpacked[1];
 
         // Now read the full frame
         $this->fillBuffer($size);

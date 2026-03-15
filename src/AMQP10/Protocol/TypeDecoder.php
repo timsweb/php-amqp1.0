@@ -202,7 +202,9 @@ class TypeDecoder
 
     private function readUint16(): int
     {
-        $v = unpack('n', substr($this->buffer, $this->offset, 2))[1];
+        $unpacked = unpack('n', substr($this->buffer, $this->offset, 2));
+        assert(is_array($unpacked));
+        $v = $unpacked[1];
         $this->offset += 2;
 
         return $v;
@@ -217,7 +219,9 @@ class TypeDecoder
 
     private function readUint32(): int
     {
-        $v = unpack('N', substr($this->buffer, $this->offset, 4))[1];
+        $unpacked = unpack('N', substr($this->buffer, $this->offset, 4));
+        assert(is_array($unpacked));
+        $v = $unpacked[1];
         $this->offset += 4;
 
         return $v;
@@ -225,7 +229,9 @@ class TypeDecoder
 
     private function readInt32(): int
     {
-        $v = unpack('N', substr($this->buffer, $this->offset, 4))[1];
+        $unpacked = unpack('N', substr($this->buffer, $this->offset, 4));
+        assert(is_array($unpacked));
+        $v = $unpacked[1];
         $this->offset += 4;
 
         return $v >= 0x80000000 ? $v - 0x100000000 : $v;
@@ -246,7 +252,9 @@ class TypeDecoder
 
     private function readFloat(): float
     {
-        $v = unpack('G', substr($this->buffer, $this->offset, 4))[1];
+        $unpacked = unpack('G', substr($this->buffer, $this->offset, 4));
+        assert(is_array($unpacked));
+        $v = $unpacked[1];
         $this->offset += 4;
 
         return $v;
@@ -254,7 +262,9 @@ class TypeDecoder
 
     private function readDouble(): float
     {
-        $v = unpack('E', substr($this->buffer, $this->offset, 8))[1];
+        $unpacked = unpack('E', substr($this->buffer, $this->offset, 8));
+        assert(is_array($unpacked));
+        $v = $unpacked[1];
         $this->offset += 8;
 
         return $v;

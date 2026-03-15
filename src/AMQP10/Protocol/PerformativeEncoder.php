@@ -78,7 +78,7 @@ class PerformativeEncoder
     }
 
     /**
-     * @param  array<mixed, mixed>|null  $properties
+     * @param  array<string, string>|null  $properties
      */
     public static function attach(
         int $channel,

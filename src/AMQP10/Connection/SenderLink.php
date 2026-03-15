@@ -72,7 +72,7 @@ class SenderLink
         $settled = $this->sndSettleMode === PerformativeEncoder::SND_SETTLED;
 
         $overhead = 50; // frame header + TRANSFER performative
-        $chunkSize = $this->maxFrameSize - $overhead;
+        $chunkSize = max(1, $this->maxFrameSize - $overhead);
 
         if (strlen($messagePayload) <= $chunkSize) {
             $this->session->transport()->send(PerformativeEncoder::transfer(

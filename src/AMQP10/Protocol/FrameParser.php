@@ -57,7 +57,10 @@ class FrameParser
     /** Extract the CHANNEL number (uint16) */
     public static function extractChannel(string $frame): int
     {
-        return unpack('n', substr($frame, 6, 2))[1];
+        $unpacked = unpack('n', substr($frame, 6, 2));
+        assert(is_array($unpacked));
+
+        return $unpacked[1];
     }
 
     /**
@@ -74,7 +77,9 @@ class FrameParser
     private function parse(): void
     {
         while (strlen($this->buffer) >= 4) {
-            $size = unpack('N', substr($this->buffer, 0, 4))[1];
+            $sizeUnpacked = unpack('N', substr($this->buffer, 0, 4));
+            assert(is_array($sizeUnpacked));
+            $size = $sizeUnpacked[1];
             if ($size < 8) {
                 throw new FrameException(
                     "Frame size $size is below minimum (8 bytes)"

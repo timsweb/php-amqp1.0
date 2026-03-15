@@ -103,6 +103,7 @@ class RevoltTransport implements TransportInterface
 
     private function sendInFiber(string $bytes): void
     {
+        assert($this->stream !== null);
         $total = strlen($bytes);
         $offset = 0;
         while ($offset < $total) {
@@ -129,6 +130,8 @@ class RevoltTransport implements TransportInterface
 
     private function readInFiber(int $length): ?string
     {
+        assert($this->stream !== null);
+        $length = max(1, $length);
         $data = @fread($this->stream, $length);
 
         if ($data === false) {
