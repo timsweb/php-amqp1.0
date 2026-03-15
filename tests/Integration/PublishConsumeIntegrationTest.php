@@ -66,8 +66,8 @@ class PublishConsumeIntegrationTest extends RabbitMqTestCase
             $consumer = $client->consume($address)->credit(1)->consumer();
             $delivery = $consumer->receive();
             if ($delivery !== null) {
-                $received = $delivery->message()->body();
-                $delivery->context()->accept();
+                $received = $delivery->body();
+                $delivery->accept();
             }
             $consumer->close();
             $client->close();

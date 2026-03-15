@@ -58,8 +58,8 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
                 if ($delivery === null) {
                     break;
                 }
-                $received[] = $delivery->message()->body();
-                $delivery->context()->accept();
+                $received[] = $delivery->body();
+                $delivery->accept();
             }
             $consumer->close();
             $client->close();
@@ -111,8 +111,8 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
                 if ($delivery === null) {
                     break;
                 }
-                $received[] = $delivery->message()->body();
-                $delivery->context()->accept();
+                $received[] = $delivery->body();
+                $delivery->accept();
             }
             $consumer->close();
 
@@ -176,8 +176,8 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
                 if ($delivery === null) {
                     break;
                 }
-                $received[] = $delivery->message()->body();
-                $delivery->context()->accept();
+                $received[] = $delivery->body();
+                $delivery->accept();
             }
             $consumer->close();
 
@@ -247,8 +247,8 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
                 if ($delivery === null) {
                     break;
                 }
-                $received[] = $delivery->message()->body();
-                $delivery->context()->accept();
+                $received[] = $delivery->body();
+                $delivery->accept();
             }
             $consumer->close();
 
@@ -332,8 +332,8 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
 
             $delivery = $consumer->receive();
             if ($delivery !== null) {
-                $received[] = $delivery->message()->body();
-                $delivery->context()->accept();
+                $received[] = $delivery->body();
+                $delivery->accept();
             }
             $consumer->close();
 
@@ -397,8 +397,8 @@ class StreamFilterIntegrationTest extends RabbitMqTestCase
                 if ($delivery === null) {
                     break;
                 }
-                $received[] = $delivery->message()->body();
-                $delivery->context()->accept();
+                $received[] = $delivery->body();
+                $delivery->accept();
             }
             $consumer->close();
 

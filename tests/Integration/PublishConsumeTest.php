@@ -75,8 +75,8 @@ class PublishConsumeTest extends RabbitMqTestCase
         $consumer->close();
 
         $this->assertNotNull($delivery);
-        $this->assertSame('hello-world', $delivery->message()->body());
-        $delivery->context()->accept();
+        $this->assertSame('hello-world', $delivery->body());
+        $delivery->accept();
 
         // Cleanup
         $mgmt = $this->client->management();
