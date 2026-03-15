@@ -51,7 +51,7 @@ $consumer = $client->consume($streamAddress)
 for ($i = 0; $i < 3; $i++) {
     $delivery = $consumer->receive();
     if ($delivery !== null) {
-        echo "  Received: " . $delivery->body() . "\n";
+        echo '  Received: ' . $delivery->body() . "\n";
         $delivery->accept();
     }
 }
@@ -79,7 +79,7 @@ while (true) {
         break;
     }
     $received++;
-    echo "  Resumed: " . $delivery->body() . "\n";
+    echo '  Resumed: ' . $delivery->body() . "\n";
     $delivery->accept();
 }
 

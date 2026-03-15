@@ -51,7 +51,7 @@ while (true) {
         break;
     }
     $received++;
-    echo "  Received: " . $delivery->body() . "\n";
+    echo '  Received: ' . $delivery->body() . "\n";
     $delivery->accept();
 }
 

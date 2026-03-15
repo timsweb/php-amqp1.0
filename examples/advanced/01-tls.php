@@ -42,7 +42,7 @@ $mgmt->close();
 
 $address = AddressHelper::queueAddress('example-tls');
 $outcome = $client->publish($address)->send(Message::create('Hello over TLS!'));
-echo "Published over TLS: " . ($outcome->isAccepted() ? 'accepted' : 'not accepted') . "\n";
+echo 'Published over TLS: ' . ($outcome->isAccepted() ? 'accepted' : 'not accepted') . "\n";
 
 // Teardown
 $mgmt = $client->management();

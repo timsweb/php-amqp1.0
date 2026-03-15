@@ -32,13 +32,13 @@ echo "Deleted exchange\n";
 try {
     $mgmt->deleteQueue('nonexistent-queue');
 } catch (QueueNotFoundException $e) {
-    echo "Queue not found (expected): " . $e->getMessage() . "\n";
+    echo 'Queue not found (expected): ' . $e->getMessage() . "\n";
 }
 
 try {
     $mgmt->deleteExchange('nonexistent-exchange');
 } catch (ExchangeNotFoundException $e) {
-    echo "Exchange not found (expected): " . $e->getMessage() . "\n";
+    echo 'Exchange not found (expected): ' . $e->getMessage() . "\n";
 }
 
 $mgmt->close();

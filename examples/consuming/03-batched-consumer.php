@@ -68,7 +68,7 @@ while ($processed < $total) {
     echo "Batch $batchNum: processing " . count($batch) . " messages\n";
 
     foreach ($batch as $delivery) {
-        echo "  -> " . $delivery->body() . "\n";
+        echo '  -> ' . $delivery->body() . "\n";
         $delivery->accept();
         $processed++;
     }

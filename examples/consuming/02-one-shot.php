@@ -29,7 +29,7 @@ $consumer = $client->consume($address)->credit(1)->consumer();
 $delivery = $consumer->receive();
 
 if ($delivery !== null) {
-    echo "Received: " . $delivery->body() . "\n";
+    echo 'Received: ' . $delivery->body() . "\n";
     $delivery->accept();
 } else {
     echo "No message received (queue empty or timeout)\n";

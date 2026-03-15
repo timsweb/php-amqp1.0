@@ -40,15 +40,15 @@ $delivery = $consumer->receive();
 
 if ($delivery !== null) {
     $msg = $delivery->message();
-    echo "message-id:     " . $msg->property('message-id') . "\n";
-    echo "correlation-id: " . $msg->property('correlation-id') . "\n";
-    echo "subject:        " . ($msg->subject() ?? '(none)') . "\n";
-    echo "content-type:   " . $msg->property('content-type') . "\n";
-    echo "ttl:            " . $msg->ttl() . "\n";
-    echo "priority:       " . $msg->priority() . "\n";
-    echo "tenant:         " . $msg->applicationProperty('tenant') . "\n";
-    echo "region:         " . $msg->applicationProperty('region') . "\n";
-    echo "body:           " . $msg->body() . "\n";
+    echo 'message-id:     ' . $msg->property('message-id') . "\n";
+    echo 'correlation-id: ' . $msg->property('correlation-id') . "\n";
+    echo 'subject:        ' . ($msg->subject() ?? '(none)') . "\n";
+    echo 'content-type:   ' . $msg->property('content-type') . "\n";
+    echo 'ttl:            ' . $msg->ttl() . "\n";
+    echo 'priority:       ' . $msg->priority() . "\n";
+    echo 'tenant:         ' . $msg->applicationProperty('tenant') . "\n";
+    echo 'region:         ' . $msg->applicationProperty('region') . "\n";
+    echo 'body:           ' . $msg->body() . "\n";
     $delivery->accept();
 }
 

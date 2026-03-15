@@ -34,7 +34,7 @@ $mgmt->close();
 // Publish to the exchange using the routing key
 $exchangeAddress = AddressHelper::exchangeAddress('example-exchange', 'orders');
 $outcome = $client->publish($exchangeAddress)->send(Message::create('Routed message'));
-echo "Published to exchange: " . ($outcome->isAccepted() ? 'accepted' : 'not accepted') . "\n";
+echo 'Published to exchange: ' . ($outcome->isAccepted() ? 'accepted' : 'not accepted') . "\n";
 
 // Consume from the queue to confirm routing worked
 $queueAddress = AddressHelper::queueAddress('example-bound-queue');
@@ -42,7 +42,7 @@ $consumer = $client->consume($queueAddress)->withIdleTimeout(5.0)->credit(1)->co
 $delivery = $consumer->receive();
 
 if ($delivery !== null) {
-    echo "Received via exchange routing: " . $delivery->body() . "\n";
+    echo 'Received via exchange routing: ' . $delivery->body() . "\n";
     $delivery->accept();
 }
 $consumer->close();
