@@ -140,11 +140,63 @@ $builder->handle(function (Message $msg, DeliveryContext $ctx) use ($consumer, &
 
 **Configure before materialising.** Builder settings (credit, offset, filters, etc.) must be set before `consumer()` or `run()` is called. Calling a builder setter after `consumer()` has been called has no effect on the cached instance — consistent with `PublisherBuilder`.
 
-**`stop()` is cooperative.** `Consumer::receive()` checks `$stopRequested` at the top of each iteration, after each `transport->read()` call returns. With the default 30-second read timeout, a stop signal may not be observed for up to 30 seconds if the queue is idle. Users with tighter latency requirements should pass a shorter `idleTimeout` to `ConsumerBuilder`'s constructor via `$client->consume($address, idleTimeout: 5.0)`.
+**`stop()` is cooperative.** `Consumer::receive()` checks `$stopRequested` at the top of each iteration, after each `transport->read()` call returns. With the default 30-second read timeout, a stop signal may not be observed for up to 30 seconds if the queue is idle. Users with tighter latency requirements can set a shorter idle timeout via the new `withIdleTimeout()` fluent setter (see below).
 
 **`run()` calls `consumer()` — always.** If the user never calls `consumer()` manually, `run()` creates and caches the instance as before. No behaviour change for existing code.
 
 **Reconnect.** `Consumer::run()` handles reconnect internally via `reattach()` on the same consumer instance. The cached reference remains valid across reconnects.
+
+---
+
+## Additional Change: `withIdleTimeout()` fluent setter
+
+`idleTimeout` currently has no fluent setter on `ConsumerBuilder` — users must pass it as a named constructor argument on `Client::consume()`, which is not discoverable. Since idle timeout directly affects stop-latency (see above), this is worth adding alongside the caching change.
+
+```php
+public function withIdleTimeout(float $timeout): self
+{
+    $this->idleTimeout     = $timeout;
+    $this->cachedConsumer  = null; // invalidate if already materialised
+    return $this;
+}
+```
+
+Invalidating the cache on change is the right behaviour here — `idleTimeout` is passed to `Consumer`'s constructor and cannot be changed after construction. If a user calls `withIdleTimeout()` after `consumer()`, they get a fresh consumer with the new timeout, consistent with the principle of least surprise.
+
+Usage:
+
+```php
+$client->consume('/queues/events')
+    ->withIdleTimeout(5.0) // stop() observed within 5s even on an idle queue
+    ->handle($handler)
+    ->run();
+```
+
+---
+
+## "Configure Before Materialise" Contract
+
+Calling most builder setters after `consumer()` has been called silently has no effect on the cached instance — the same contract as `PublisherBuilder`. This is acceptable because builder setters are configuration, not runtime controls, and the pattern of grabbing `consumer()` after all configuration is set is clear and documented.
+
+`withIdleTimeout()` is the one exception: it explicitly invalidates the cache, because idle timeout has a direct bearing on stop responsiveness and a user may reasonably want to adjust it alongside grabbing the consumer reference.
+
+No setters throw on post-materialise calls. Throwing would be surprising in a fluent builder and would break the common pattern of conditionally setting options before calling `consumer()`.
+
+---
+
+## Future Consideration: Dynamic Credit Control
+
+AMQP 1.0 link credit is a flow-control primitive — the receiver can send a FLOW frame at any time to grant more credit, reduce it, or set it to zero to pause delivery entirely. The builder's `credit()` setting controls the *initial grant and auto-replenishment window*; adjusting credit at runtime is a distinct concept.
+
+Potential future API:
+
+```php
+$consumer->pauseDelivery();       // send FLOW with credit=0
+$consumer->resumeDelivery();      // send FLOW restoring original credit
+$consumer->grantCredit(int $n);   // explicit one-time grant
+```
+
+This is out of scope for this change but would build naturally on the consumer reference pattern introduced here.
 
 ---
 
@@ -163,9 +215,10 @@ New unit tests in `ConsumerBuilderTest`:
 
 1. `consumer()` returns the same instance on repeated calls.
 2. `run()` uses the cached instance from a prior `consumer()` call.
-3. Calling a builder setter (e.g. `credit()`) after `consumer()` does not affect the cached instance — "configure before materialise" contract is enforced by the cache, not by throwing.
-4. Count-based stop: consumer stops after exactly N messages using a reference obtained via `consumer()`.
-5. Time-based stop simulation: `EventLoop::delay()` fires and calls `stop()`; `run()` returns; delayed timer is cancelled cleanly.
+3. Calling a builder setter (e.g. `credit()`) after `consumer()` does not affect the cached instance.
+4. `withIdleTimeout()` after `consumer()` invalidates the cache — the next `consumer()` call returns a fresh instance.
+5. Count-based stop: consumer stops after exactly N messages using a reference obtained via `consumer()`.
+6. Time-based stop simulation: `EventLoop::delay()` fires and calls `stop()`; `run()` returns; delayed timer is cancelled cleanly.
 
 ---
 
@@ -173,6 +226,6 @@ New unit tests in `ConsumerBuilderTest`:
 
 | File | Change |
 |------|--------|
-| `src/AMQP10/Messaging/ConsumerBuilder.php` | Add `$cachedConsumer` property; update `consumer()` to cache |
+| `src/AMQP10/Messaging/ConsumerBuilder.php` | Add `$cachedConsumer`; update `consumer()` to cache; add `withIdleTimeout()` |
 | `tests/Unit/Messaging/ConsumerBuilderTest.php` | New tests per above |
 | `README.md` | Add "Consumer Stop Control" section documenting the patterns |
