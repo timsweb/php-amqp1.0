@@ -241,19 +241,19 @@ class ConsumerBuilder
     {
         if ($this->cachedConsumer === null) {
             $this->cachedConsumer = new Consumer(
-                client:             $this->client,
-                address:            $this->address,
-                credit:             $this->credit,
-                offset:             $this->offset,
-                filterJms:          $this->filterJms,
-                filterAmqpSql:      $this->filterAmqpSql,
-                filterBloomValues:  $this->filterBloomValues,
-                matchUnfiltered:    $this->matchUnfiltered,
-                idleTimeout:        $this->idleTimeout,
-                linkName:           $this->linkName,
-                durable:            $this->durable,
-                expiryPolicy:       $this->expiryPolicy,
-                reconnectRetries:   $this->reconnectRetries,
+                client: $this->client,
+                address: $this->address,
+                credit: $this->credit,
+                offset: $this->offset,
+                filterJms: $this->filterJms,
+                filterAmqpSql: $this->filterAmqpSql,
+                filterBloomValues: $this->filterBloomValues,
+                matchUnfiltered: $this->matchUnfiltered,
+                idleTimeout: $this->idleTimeout,
+                linkName: $this->linkName,
+                durable: $this->durable,
+                expiryPolicy: $this->expiryPolicy,
+                reconnectRetries: $this->reconnectRetries,
                 reconnectBackoffMs: $this->reconnectBackoffMs,
             );
         }

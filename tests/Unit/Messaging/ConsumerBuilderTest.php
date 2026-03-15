@@ -15,7 +15,6 @@ use AMQP10\Tests\Mocks\ClientMock;
 use AMQP10\Tests\Mocks\TransportMock;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
-use Revolt\EventLoop;
 
 class ConsumerBuilderTest extends TestCase
 {
