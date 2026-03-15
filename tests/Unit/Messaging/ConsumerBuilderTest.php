@@ -61,11 +61,12 @@ class ConsumerBuilderTest extends TestCase
         $client  = $this->createMock(Client::class);
         $builder = new ConsumerBuilder($client, '/queues/test');
 
-        // Force idleTimeout to be mutable by checking we can set it
-        $builder->withIdleTimeout(5.0);
+        $builder->consumer(); // prime the cache
 
-        $ref = new ReflectionProperty(ConsumerBuilder::class, 'idleTimeout');
+        $builder->withIdleTimeout(5.0); // should invalidate
+
+        $ref = new ReflectionProperty(ConsumerBuilder::class, 'cachedConsumer');
         $ref->setAccessible(true);
-        $this->assertSame(5.0, $ref->getValue($builder));
+        $this->assertNull($ref->getValue($builder));
     }
 }

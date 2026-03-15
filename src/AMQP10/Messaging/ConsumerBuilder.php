@@ -116,6 +116,12 @@ class ConsumerBuilder
         return $this;
     }
 
+    /**
+     * Set the idle read timeout (seconds). Invalidates the cached consumer if already materialised,
+     * because idle timeout is passed to Consumer's constructor and cannot be changed post-construction.
+     * All other builder setters follow a "configure before materialise" contract and silently have
+     * no effect on the cached instance if called after consumer() or run().
+     */
     public function withIdleTimeout(float $timeout): self
     {
         $this->idleTimeout    = $timeout;
