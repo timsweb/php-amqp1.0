@@ -229,6 +229,14 @@ class ConsumerBuilder
         }
     }
 
+    /**
+     * Return the cached Consumer instance, creating it on first call.
+     *
+     * Configure all builder options before calling this method. After the Consumer
+     * is materialised, most setter calls (credit, offset, filters, etc.) have no
+     * effect on the cached instance — the only exception is withIdleTimeout(), which
+     * explicitly invalidates the cache. This matches the contract of PublisherBuilder.
+     */
     public function consumer(): Consumer
     {
         if ($this->cachedConsumer === null) {
