@@ -184,22 +184,6 @@ No setters throw on post-materialise calls. Throwing would be surprising in a fl
 
 ---
 
-## Future Consideration: Dynamic Credit Control
-
-AMQP 1.0 link credit is a flow-control primitive — the receiver can send a FLOW frame at any time to grant more credit, reduce it, or set it to zero to pause delivery entirely. The builder's `credit()` setting controls the *initial grant and auto-replenishment window*; adjusting credit at runtime is a distinct concept.
-
-Potential future API:
-
-```php
-$consumer->pauseDelivery();       // send FLOW with credit=0
-$consumer->resumeDelivery();      // send FLOW restoring original credit
-$consumer->grantCredit(int $n);   // explicit one-time grant
-```
-
-This is out of scope for this change but would build naturally on the consumer reference pattern introduced here.
-
----
-
 ## What Is Not Changing
 
 - No new builder methods (`stopAfter()`, `stopWhen()` etc.) — YAGNI. The primitive is `stop()`; users compose termination logic themselves.
