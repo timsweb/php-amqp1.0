@@ -7,7 +7,7 @@ namespace AMQP10\Tests\Unit\Messaging;
 use AMQP10\Client\Client;
 use AMQP10\Connection\Session;
 use AMQP10\Messaging\ConsumerBuilder;
-use AMQP10\Messaging\DeliveryContext;
+use AMQP10\Messaging\InboundMessage;
 use AMQP10\Messaging\Message;
 use AMQP10\Messaging\MessageEncoder;
 use AMQP10\Protocol\PerformativeEncoder;
@@ -163,8 +163,8 @@ class ConsumerBuilderTest extends TestCase
         $consumer = $builder->consumer();
         $count    = 0;
 
-        $builder->handle(function (Message $msg, DeliveryContext $ctx) use ($consumer, &$count): void {
-            $ctx->accept();
+        $builder->handle(function (InboundMessage $msg) use ($consumer, &$count): void {
+            $msg->accept();
             if (++$count >= 3) {
                 $consumer->stop();
             }
@@ -191,7 +191,7 @@ class ConsumerBuilderTest extends TestCase
 
         // Stop immediately — if run() uses the same instance, it will exit at once
         $consumer->stop();
-        $builder->handle(fn(Message $msg, DeliveryContext $ctx) => $ctx->accept())->run();
+        $builder->handle(fn(InboundMessage $msg) => $msg->accept())->run();
 
         // If we reached here without hanging, run() used the cached (pre-stopped) consumer
         $this->assertTrue(true);
