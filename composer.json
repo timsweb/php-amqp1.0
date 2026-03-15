@@ -1,13 +1,13 @@
 {
-    "name": "php-amqp10/client",
+    "name": "timsweb/php-amqp1.0",
     "description": "Modern PHP AMQP 1.0 client library for RabbitMQ 4.0+",
     "type": "library",
     "license": "Apache-2.0",
     "keywords": ["amqp", "amqp10", "rabbitmq", "messaging", "queue"],
-    "homepage": "https://github.com/php-amqp10/client",
+    "homepage": "https://github.com/timsweb/php-amqp1.0",
     "support": {
-        "issues": "https://github.com/php-amqp10/client/issues",
-        "source": "https://github.com/php-amqp10/client"
+        "issues": "https://github.com/timsweb/php-amqp1.0/issues",
+        "source": "https://github.com/timsweb/php-amqp1.0"
     },
     "require": {
         "php": ">=8.2",
@@ -16,7 +16,7 @@
     "require-dev": {
         "phpunit/phpunit": "^10.0",
         "phpstan/phpstan": "^1.0",
-        "laravel/pint": "^1.0",
+        "laravel/pint": "^1.29",
         "testcontainers/testcontainers": "^0.2"
     },
     "autoload": {
