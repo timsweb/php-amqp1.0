@@ -38,7 +38,7 @@ echo "Published to exchange: " . ($outcome->isAccepted() ? 'accepted' : 'not acc
 
 // Consume from the queue to confirm routing worked
 $queueAddress = AddressHelper::queueAddress('example-bound-queue');
-$consumer = $client->consume($queueAddress)->credit(1)->consumer();
+$consumer = $client->consume($queueAddress)->withIdleTimeout(5.0)->credit(1)->consumer();
 $delivery = $consumer->receive();
 
 if ($delivery !== null) {

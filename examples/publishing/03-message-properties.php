@@ -35,7 +35,7 @@ echo "Published message with properties\n";
 
 // Consume and read back to confirm round-trip.
 // AMQP properties are read via property(key); application headers via applicationProperty(key).
-$consumer = $client->consume($address)->credit(1)->consumer();
+$consumer = $client->consume($address)->withIdleTimeout(5.0)->credit(1)->consumer();
 $delivery = $consumer->receive();
 
 if ($delivery !== null) {
