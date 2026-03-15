@@ -46,10 +46,12 @@ class ConsumerBuilder
 
     private ?Closure $signalHandler = null;
 
+    private ?Consumer $cachedConsumer = null;
+
     public function __construct(
         private readonly Client $client,
         private readonly string $address,
-        private readonly float $idleTimeout = 30.0,
+        private float $idleTimeout = 30.0,
     ) {}
 
     public function handle(Closure $handler): self
@@ -110,6 +112,14 @@ class ConsumerBuilder
     {
         $this->reconnectRetries = $maxRetries;
         $this->reconnectBackoffMs = $backoffMs;
+
+        return $this;
+    }
+
+    public function withIdleTimeout(float $timeout): self
+    {
+        $this->idleTimeout    = $timeout;
+        $this->cachedConsumer = null;
 
         return $this;
     }
@@ -215,21 +225,25 @@ class ConsumerBuilder
 
     public function consumer(): Consumer
     {
-        return new Consumer(
-            client: $this->client,
-            address: $this->address,
-            credit: $this->credit,
-            offset: $this->offset,
-            filterJms: $this->filterJms,
-            filterAmqpSql: $this->filterAmqpSql,
-            filterBloomValues: $this->filterBloomValues,
-            matchUnfiltered: $this->matchUnfiltered,
-            idleTimeout: $this->idleTimeout,
-            linkName: $this->linkName,
-            durable: $this->durable,
-            expiryPolicy: $this->expiryPolicy,
-            reconnectRetries: $this->reconnectRetries,
-            reconnectBackoffMs: $this->reconnectBackoffMs,
-        );
+        if ($this->cachedConsumer === null) {
+            $this->cachedConsumer = new Consumer(
+                client:             $this->client,
+                address:            $this->address,
+                credit:             $this->credit,
+                offset:             $this->offset,
+                filterJms:          $this->filterJms,
+                filterAmqpSql:      $this->filterAmqpSql,
+                filterBloomValues:  $this->filterBloomValues,
+                matchUnfiltered:    $this->matchUnfiltered,
+                idleTimeout:        $this->idleTimeout,
+                linkName:           $this->linkName,
+                durable:            $this->durable,
+                expiryPolicy:       $this->expiryPolicy,
+                reconnectRetries:   $this->reconnectRetries,
+                reconnectBackoffMs: $this->reconnectBackoffMs,
+            );
+        }
+
+        return $this->cachedConsumer;
     }
 }
