@@ -13,7 +13,6 @@ class VirtualHostTest extends TestCase
     private function extractVhost(string $uri): string
     {
         $method = new ReflectionMethod(Connection::class, 'resolveVhost');
-        $method->setAccessible(true);
 
         return $method->invoke(null, $uri);
     }

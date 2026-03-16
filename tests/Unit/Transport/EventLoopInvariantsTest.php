@@ -67,7 +67,6 @@ class EventLoopInvariantsTest extends TestCase
 
         $transport = new RevoltTransport();
         $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
-        $ref->setAccessible(true);
         $ref->setValue($transport, $a);
 
         $transport->send('ping'); // must not hang

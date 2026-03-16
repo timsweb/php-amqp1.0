@@ -36,7 +36,6 @@ class MultiFrameTransferTest extends TestCase
 
         // Inject as attached via reflection
         $ref = new ReflectionProperty(SenderLink::class, 'attached');
-        $ref->setAccessible(true);
         $ref->setValue($link, true);
 
         $payload = str_repeat('X', 600); // bigger than 512 byte frame limit

@@ -266,7 +266,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('getFrameDescriptor');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer, $transferFrame);
 
@@ -281,7 +280,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('getFrameDescriptor');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer, '');
 
@@ -296,7 +294,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -325,7 +322,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -359,7 +355,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -384,7 +379,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -513,7 +507,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -541,7 +534,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -570,7 +562,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -600,7 +591,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -633,7 +623,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -668,7 +657,6 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $method = $reflection->getMethod('buildFilterMap');
-        $method->setAccessible(true);
 
         $result = $method->invoke($consumer);
 
@@ -697,9 +685,7 @@ class ConsumerTest extends TestCase
 
         $reflection = new ReflectionClass($consumer);
         $filterAmqpSqlProperty = $reflection->getProperty('filterAmqpSql');
-        $filterAmqpSqlProperty->setAccessible(true);
         $filterJmsProperty = $reflection->getProperty('filterJms');
-        $filterJmsProperty->setAccessible(true);
 
         // filterSql() should map to filterAmqpSql, not filterJms
         $this->assertSame('priority > 5', $filterAmqpSqlProperty->getValue($consumer));
@@ -806,7 +792,6 @@ class ConsumerTest extends TestCase
         $consumer = new Consumer($client, '/queues/test', credit: 1);
 
         $ref = new ReflectionProperty(Consumer::class, 'stopRequested');
-        $ref->setAccessible(true);
 
         $this->assertFalse($ref->getValue($consumer));
 
@@ -834,7 +819,6 @@ class ConsumerTest extends TestCase
 
         // Actually test stop: set attached state then call stop() before receive()
         $refAttached = new ReflectionProperty(Consumer::class, 'attached');
-        $refAttached->setAccessible(true);
         $refAttached->setValue($consumer, true);
 
         $consumer->stop();

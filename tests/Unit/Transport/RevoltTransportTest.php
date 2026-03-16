@@ -47,7 +47,6 @@ class RevoltTransportTest extends TestCase
 
         $t = new RevoltTransport();
         $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
-        $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 
@@ -68,7 +67,6 @@ class RevoltTransportTest extends TestCase
 
         $t = new RevoltTransport(readTimeout: 1.0);
         $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
-        $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 
@@ -88,7 +86,6 @@ class RevoltTransportTest extends TestCase
 
         $t = new RevoltTransport(readTimeout: 0.05);
         $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
-        $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 
@@ -107,7 +104,6 @@ class RevoltTransportTest extends TestCase
 
         $t = new RevoltTransport(readTimeout: 1.0);
         $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
-        $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 
@@ -128,7 +124,6 @@ class RevoltTransportTest extends TestCase
 
         $t = new RevoltTransport();
         $ref = new ReflectionProperty(RevoltTransport::class, 'stream');
-        $ref->setAccessible(true);
         $ref->setValue($t, $a);
         stream_set_blocking($a, false);
 

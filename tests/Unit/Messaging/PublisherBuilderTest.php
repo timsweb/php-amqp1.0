@@ -16,7 +16,6 @@ class PublisherBuilderTest extends TestCase
         $client = $this->createMock(Client::class);
         $builder = new PublisherBuilder($client, '/queues/test');
         $ref = new ReflectionProperty(PublisherBuilder::class, 'cachedPublisher');
-        $ref->setAccessible(true);
         $this->assertNull($ref->getValue($builder));
     }
 
@@ -26,7 +25,6 @@ class PublisherBuilderTest extends TestCase
         $builder = new PublisherBuilder($client, '/queues/test');
         $builder->fireAndForget();
         $ref = new ReflectionProperty(PublisherBuilder::class, 'preSettled');
-        $ref->setAccessible(true);
         $this->assertTrue($ref->getValue($builder));
     }
 }

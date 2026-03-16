@@ -20,35 +20,44 @@ class ConsumerBuilderTest extends TestCase
 {
     public function test_stop_on_signal_stores_signals(): void
     {
+        if (! defined('SIGINT')) {
+            $this->markTestSkipped('ext-pcntl not available');
+        }
+
         $client = $this->createMock(Client::class);
         $builder = new ConsumerBuilder($client, '/queues/test');
         $builder->stopOnSignal([SIGINT, SIGTERM]);
 
         $ref = new ReflectionProperty(ConsumerBuilder::class, 'stopSignals');
-        $ref->setAccessible(true);
         $this->assertSame([SIGINT, SIGTERM], $ref->getValue($builder));
     }
 
     public function test_stop_on_signal_accepts_single_int(): void
     {
+        if (! defined('SIGINT')) {
+            $this->markTestSkipped('ext-pcntl not available');
+        }
+
         $client = $this->createMock(Client::class);
         $builder = new ConsumerBuilder($client, '/queues/test');
         $builder->stopOnSignal(SIGINT);
 
         $ref = new ReflectionProperty(ConsumerBuilder::class, 'stopSignals');
-        $ref->setAccessible(true);
         $this->assertSame([SIGINT], $ref->getValue($builder));
     }
 
     public function test_stop_on_signal_stores_handler(): void
     {
+        if (! defined('SIGINT')) {
+            $this->markTestSkipped('ext-pcntl not available');
+        }
+
         $client = $this->createMock(Client::class);
         $builder = new ConsumerBuilder($client, '/queues/test');
         $callback = fn(int $signal) => null;
         $builder->stopOnSignal(SIGINT, $callback);
 
         $ref = new ReflectionProperty(ConsumerBuilder::class, 'signalHandler');
-        $ref->setAccessible(true);
         $this->assertSame($callback, $ref->getValue($builder));
     }
 
@@ -59,7 +68,6 @@ class ConsumerBuilderTest extends TestCase
         $builder->withIdleTimeout(5.0);
 
         $ref = new ReflectionProperty(ConsumerBuilder::class, 'idleTimeout');
-        $ref->setAccessible(true);
         $this->assertSame(5.0, $ref->getValue($builder));
     }
 
@@ -73,7 +81,6 @@ class ConsumerBuilderTest extends TestCase
         $builder->withIdleTimeout(5.0); // should invalidate
 
         $ref = new ReflectionProperty(ConsumerBuilder::class, 'cachedConsumer');
-        $ref->setAccessible(true);
         $this->assertNull($ref->getValue($builder));
     }
 
@@ -113,7 +120,6 @@ class ConsumerBuilderTest extends TestCase
         $this->assertNotSame($first, $second);
 
         $ref = new ReflectionProperty(ConsumerBuilder::class, 'idleTimeout');
-        $ref->setAccessible(true);
         $this->assertSame(2.0, $ref->getValue($builder));
     }
 
