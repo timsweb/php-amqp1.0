@@ -103,16 +103,15 @@ $client->publish('/exchanges/events')
 
 ```php
 use AMQP10\Client\Client;
-use AMQP10\Messaging\Message;
-use AMQP10\Messaging\DeliveryContext;
+use AMQP10\Messaging\InboundMessage;
 
 $client = new Client('amqp://guest:guest@localhost:5672');
 $client->connect();
 
 $client->consume('/queues/my-queue')
-    ->handle(function (Message $msg, DeliveryContext $ctx) {
+    ->handle(function (InboundMessage $msg) {
         echo "Received: " . $msg->body() . "\n";
-        $ctx->accept();
+        $msg->accept();
     })
     ->stopOnSignal([SIGINT, SIGTERM])  // Ctrl+C stops cleanly after current message
     ->run();                          // blocks here
@@ -124,7 +123,7 @@ The optional second argument to `stopOnSignal()` is a callback fired when the si
 
 ```php
 $client->consume('/queues/my-queue')
-    ->handle(fn(Message $msg, DeliveryContext $ctx) => $ctx->accept())
+    ->handle(fn(InboundMessage $msg) => $msg->accept())
     ->stopOnSignal([SIGINT, SIGTERM], function (int $signal) use ($output) {
         $output->writeln('<comment>Signal ' . $signal . ' received, finishing current message...</comment>');
     })
@@ -138,9 +137,9 @@ $client->consume('/queues/my-queue')
 ```php
 $client->consume('/queues/my-queue')
     ->prefetch(10) // Allow up to 10 unacknowledged messages in flight
-    ->handle(function (Message $msg, DeliveryContext $ctx) {
+    ->handle(function (InboundMessage $msg) {
         processMessage($msg);
-        $ctx->accept();
+        $msg->accept();
     })
     ->stopOnSignal(SIGINT)
     ->run();
@@ -159,9 +158,9 @@ $client->consume('/queues/orders')
     ->durable(TerminusDurability::UnsettledState)
     ->expiryPolicy(ExpiryPolicy::Never)
     ->withReconnect(maxRetries: 10, backoffMs: 1000)
-    ->handle(function (Message $msg, DeliveryContext $ctx) {
+    ->handle(function (InboundMessage $msg) {
         // process message
-        $ctx->accept();
+        $msg->accept();
     })
     ->stopOnSignal([SIGINT, SIGTERM])
     ->run();
@@ -196,9 +195,9 @@ class PopularityWorker
         $builder->run();
     }
 
-    private function handle(Message $msg, DeliveryContext $ctx): void
+    private function handle(InboundMessage $msg): void
     {
-        $ctx->accept();
+        $msg->accept();
         if (++$this->count >= 1000) {
             $this->consumer->stop();
         }
@@ -255,14 +254,14 @@ When consuming messages, the delivery context provides methods to control messag
 
 ```php
 $client->consume('/queues/my-queue')
-    ->handle(function (Message $msg, DeliveryContext $ctx) {
+    ->handle(function (InboundMessage $msg) {
         try {
             processMessage($msg);
-            $ctx->accept();  // Acknowledge successful processing
+            $msg->accept();  // Acknowledge successful processing
         } catch (\Exception $e) {
-            $ctx->release(); // Return message to queue for redelivery
+            $msg->release(); // Return message to queue for redelivery
             // OR
-            // $ctx->reject(); // Reject without redelivery
+            // $msg->reject(); // Reject without redelivery
         }
     })
     ->run();
@@ -272,10 +271,10 @@ $client->consume('/queues/my-queue')
 
 ```php
 // Retry on a different consumer (dead-letter on failure elsewhere)
-$ctx->modify(deliveryFailed: true, undeliverableHere: false); // retry elsewhere
+$msg->modify(deliveryFailed: true, undeliverableHere: false); // retry elsewhere
 
 // Dead-letter the message
-$ctx->modify(deliveryFailed: true, undeliverableHere: true);  // dead-letter
+$msg->modify(deliveryFailed: true, undeliverableHere: true);  // dead-letter
 ```
 
 ## Management API
@@ -384,8 +383,8 @@ $client->consume('/queues/my-queue')
     ->filterJms('priority > 5')          // JMS SQL selector (ActiveMQ/Artemis only)
     ->filterBloom('value')               // RabbitMQ Bloom filter (streams only)
     ->filterBloom(['invoices', 'orders'], matchUnfiltered: true)  // Multiple values + match unfiltered
-    ->handle(function (Message $msg, DeliveryContext $ctx) {
-        $ctx->accept();
+    ->handle(function (InboundMessage $msg) {
+        $msg->accept();
     })
     ->onError(function (\Throwable $error) {
         error_log("Consumer error: " . $error->getMessage());
