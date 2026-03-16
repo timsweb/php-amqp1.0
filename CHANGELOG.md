@@ -43,7 +43,7 @@ Initial release.
   - Consumer stop control via cached `Consumer` reference (`consumer()` before `run()`)
   - Idle timeout configuration (`withIdleTimeout()`)
 - `Message` with fluent wither API (`withSubject`, `withContentType`, `withMessageId`, `withCorrelationId`, `withApplicationProperty`, `withTtl`, `withDurable`)
-- `DeliveryContext` with accept / release / reject / modify outcomes
+- `InboundMessage` — unified received-message object with delegated read accessors and settlement methods (`accept()`, `release()`, `reject()`, `modify()`)
 - Modified outcome for dead-letter and retry-elsewhere patterns
 
 **Stream filtering** (RabbitMQ streams)
@@ -63,5 +63,5 @@ Initial release.
 - RabbitMQ AMQP 1.0 v2 address format (`/queues/name`, `/exchanges/name/routing-key`)
 
 **Testing**
-- 262 unit tests, 507 assertions
+- 260 unit tests, 476 assertions
 - Integration test suite using [testcontainers-php](https://github.com/testcontainers/testcontainers-php) (requires Docker)
