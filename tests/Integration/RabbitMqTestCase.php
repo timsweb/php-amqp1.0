@@ -53,8 +53,14 @@ abstract class RabbitMqTestCase extends TestCase
         parent::tearDownAfterClass();
 
         if (self::$container !== null) {
-            self::$container->stop();
-            self::$container->remove();
+            try {
+                self::$container->stop();
+            } catch (Throwable) {
+            }
+            try {
+                self::$container->remove();
+            } catch (Throwable) {
+            }
             self::$container = null;
             self::$amqpUri = '';
             self::$hostPort = 0;
