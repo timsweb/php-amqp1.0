@@ -490,11 +490,14 @@ try {
 # Install dependencies
 composer install
 
-# Run unit tests
-./vendor/bin/phpunit
+# Unit tests only
+./vendor/bin/phpunit --testsuite Unit
 
-# Run integration tests (starts RabbitMQ automatically via testcontainers — requires Docker)
-./vendor/bin/phpunit --testsuite Integration
+# Unit + RabbitMQ integration tests (starts RabbitMQ automatically via testcontainers — requires Docker)
+./vendor/bin/phpunit --testsuite Unit,Integration
+
+# IBM MQ integration tests (requires a locally-built Docker image — see docs/brokers/ibm-mq.md)
+./vendor/bin/phpunit --testsuite IbmMq
 ```
 
 ## License

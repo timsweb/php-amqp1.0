@@ -54,20 +54,17 @@ Client API          src/AMQP10/Client/
 # Unit tests only (no broker needed)
 ./vendor/bin/phpunit --testsuite Unit
 
-# All integration tests (RabbitMQ starts automatically via testcontainers — requires Docker)
-./vendor/bin/phpunit --testsuite Integration
-
-# RabbitMQ integration tests only
-./vendor/bin/phpunit --testsuite Integration --filter RabbitMq
+# Unit + RabbitMQ integration tests — what CI runs (RabbitMQ starts automatically via testcontainers)
+./vendor/bin/phpunit --testsuite Unit,Integration
 
 # IBM MQ integration tests — against a locally-built Docker image (see docs/brokers/ibm-mq.md)
-./vendor/bin/phpunit --testsuite Integration --filter IbmMq
+./vendor/bin/phpunit --testsuite IbmMq
 
 # IBM MQ integration tests — against an external IBM MQ instance
-IBMMQ_AMQP_URI="amqp://app:passw0rd@your-host:5672/" ./vendor/bin/phpunit --testsuite Integration --filter IbmMq
+IBMMQ_AMQP_URI="amqp://app:passw0rd@your-host:5672/" ./vendor/bin/phpunit --testsuite IbmMq
 ```
 
-RabbitMQ tests spin up a container automatically via testcontainers-php. IBM MQ tests require either a pre-built local Docker image (`ibm-mqadvanced-server-dev:9.4.2.1-amd64`) or an external instance — see `docs/brokers/ibm-mq.md` for the full setup procedure. If neither is available, IBM MQ tests are skipped individually via `requireIbmMq()`.
+The `Integration` suite covers RabbitMQ only. The `IbmMq` suite is kept separate because it requires a locally-built Docker image (`ibm-mqadvanced-server-dev:9.4.2.1-amd64`) that cannot be pulled from a registry — see `docs/brokers/ibm-mq.md` for the build procedure. Running `vendor/bin/phpunit` with no arguments runs all three suites including `IbmMq`, so always use explicit suite names.
 
 ---
 

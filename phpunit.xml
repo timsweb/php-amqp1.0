@@ -9,6 +9,11 @@
         </testsuite>
         <testsuite name="Integration">
             <directory>tests/Integration</directory>
+            <exclude>tests/Integration/IbmMqTestCase.php</exclude>
+            <exclude>tests/Integration/IbmMqPublishConsumeTest.php</exclude>
+        </testsuite>
+        <testsuite name="IbmMq">
+            <file>tests/Integration/IbmMqPublishConsumeTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
