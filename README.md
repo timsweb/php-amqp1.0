@@ -502,4 +502,4 @@ composer install
 
 ## License
 
-Apache-2.0
+MIT

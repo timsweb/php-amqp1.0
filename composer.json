@@ -2,7 +2,7 @@
     "name": "timsweb/php-amqp1.0",
     "description": "Modern PHP AMQP 1.0 client library for RabbitMQ 4.0+",
     "type": "library",
-    "license": "Apache-2.0",
+    "license": "MIT",
     "keywords": ["amqp", "amqp10", "rabbitmq", "messaging", "queue"],
     "homepage": "https://github.com/timsweb/php-amqp1.0",
     "support": {
