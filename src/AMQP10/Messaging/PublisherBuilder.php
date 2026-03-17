@@ -20,12 +20,39 @@ class PublisherBuilder
 
     private int $reconnectBackoffMs = 1000;
 
+    /** @var array<string> */
+    private array $targetCapabilities = [];
+
+    private bool $messageToAddress = false;
+
     public function __construct(
         private readonly Client $client,
         private readonly string $address,
         private readonly float $timeout = 30.0,
         private readonly int $maxFrameSize = 65536,
     ) {}
+
+    /** @param  array<string>  $capabilities */
+    public function withTargetCapabilities(array $capabilities): self
+    {
+        $this->targetCapabilities = $capabilities;
+        $this->cachedPublisher = null;
+
+        return $this;
+    }
+
+    /**
+     * Populate the AMQP message properties 'to' field with the target address when not already
+     * set on the outgoing message. Required by IBM MQ when sending to a queue — it uses this
+     * field to determine the destination even when the target address is set in the ATTACH frame.
+     */
+    public function withMessageToAddress(bool $enabled = true): self
+    {
+        $this->messageToAddress = $enabled;
+        $this->cachedPublisher = null;
+
+        return $this;
+    }
 
     public function fireAndForget(): self
     {
@@ -80,6 +107,8 @@ class PublisherBuilder
                 $this->timeout,
                 $this->preSettled,
                 $this->maxFrameSize,
+                $this->targetCapabilities,
+                $this->messageToAddress,
             );
         }
 

@@ -18,6 +18,9 @@ class SenderLink
 
     private int $handle;
 
+    /**
+     * @param  array<string>  $targetCapabilities
+     */
     public function __construct(
         private readonly Session $session,
         private readonly string $name,
@@ -26,6 +29,7 @@ class SenderLink
         private readonly int $sndSettleMode = PerformativeEncoder::SND_UNSETTLED,
         private readonly bool $managementLink = false,
         private readonly int $maxFrameSize = 65536,
+        private readonly array $targetCapabilities = [],
     ) {
         $this->handle = $session->allocateHandle();
     }
@@ -49,6 +53,7 @@ class SenderLink
             sndSettleMode: $this->sndSettleMode,
             properties: $properties,
             initialDeliveryCount: $initialDeliveryCount,
+            targetCapabilities: $this->targetCapabilities !== [] ? $this->targetCapabilities : null,
         ));
         $this->session->readFrameOfType(Descriptor::ATTACH, $this->handle);
         $this->attached = true;

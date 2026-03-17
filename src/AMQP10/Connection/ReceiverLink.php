@@ -20,6 +20,9 @@ class ReceiverLink
 
     private int $handle;
 
+    /**
+     * @param  array<string>  $sourceCapabilities
+     */
     public function __construct(
         private readonly Session $session,
         private readonly string $name,
@@ -31,6 +34,7 @@ class ReceiverLink
         private readonly ?string $filterMap = null,
         private readonly ?TerminusDurability $durable = null,
         private readonly ?ExpiryPolicy $expiryPolicy = null,
+        private readonly array $sourceCapabilities = [],
     ) {
         $this->handle = $session->allocateHandle();
     }
@@ -52,6 +56,7 @@ class ReceiverLink
             filterMap: $this->filterMap,
             durable: $this->durable,
             expiryPolicy: $this->expiryPolicy,
+            sourceCapabilities: $this->sourceCapabilities !== [] ? $this->sourceCapabilities : null,
         ));
         $this->session->readFrameOfType(Descriptor::ATTACH, $this->handle);
         $this->attached = true;

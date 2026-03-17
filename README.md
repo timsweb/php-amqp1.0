@@ -1,12 +1,13 @@
 # AMQP 1.0 Client for PHP
 
-Modern PHP AMQP 1.0 client library for RabbitMQ 4.0+ with a fluent, type-safe API.
+Modern PHP AMQP 1.0 client library with a fluent, type-safe API. Tested against RabbitMQ 4.0+
+and IBM MQ 9.4.2+.
 
 ## Requirements
 
 - PHP 8.2 or higher
-- RabbitMQ 4.0+
 - revolt/event-loop ^1.0
+- A broker supporting AMQP 1.0 (RabbitMQ 4.0+, IBM MQ 9.4.2+)
 
 ## Installation
 
@@ -431,6 +432,20 @@ $client->consume('/queues/my-queue')
 - `matchUnfiltered: true` - also receive messages without filter value
 - Can combine with AMQP SQL filter for efficient 2-stage filtering
 - Reference: [RabbitMQ Stream Filtering - Stage 1: Bloom Filter](https://www.rabbitmq.com/docs/stream-filtering#stage-1-bloom-filter)
+
+## Broker Compatibility
+
+The library is tested against **RabbitMQ 4.0+** and **IBM MQ 9.4.2+**.
+
+| Broker | Status | Notes |
+|--------|--------|-------|
+| RabbitMQ 4.0+ | Supported | Full feature set including management API, streams, and filters |
+| IBM MQ 9.4.2+ | Supported | Requires different address format and additional publish options — see guide |
+
+**Broker-specific guides:**
+- [IBM MQ](docs/brokers/ibm-mq.md) — AMQP service setup, address format, and required connection options
+
+---
 
 ## Address Format
 

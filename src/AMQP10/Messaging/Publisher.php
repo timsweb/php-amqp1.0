@@ -17,29 +17,37 @@ class Publisher
 {
     private readonly SenderLink $link;
 
+    /**
+     * @param  array<string>  $targetCapabilities
+     */
     public function __construct(
         private readonly Session $session,
-        string $address,
+        private readonly string $address,
         private readonly float $timeout = 30.0,
         bool $preSettled = false,
         int $maxFrameSize = 65536,
+        array $targetCapabilities = [],
+        private readonly bool $messageToAddress = false,
     ) {
         $linkName = 'sender-' . bin2hex(random_bytes(4));
         $this->link = new SenderLink(
             $session,
             name: $linkName,
+            source: '',
             target: $address,
             sndSettleMode: $preSettled
                 ? PerformativeEncoder::SND_SETTLED
                 : PerformativeEncoder::SND_UNSETTLED,
             maxFrameSize: $maxFrameSize,
+            targetCapabilities: $targetCapabilities,
         );
         $this->link->attach();
     }
 
     public function send(Message $message): Outcome
     {
-        $payload = MessageEncoder::encode($message);
+        $toAddress = $this->messageToAddress ? $this->address : null;
+        $payload = MessageEncoder::encode($message, $toAddress);
         $deliveryId = $this->link->transfer($payload);
         if ($this->link->isPreSettled()) {
             return Outcome::accepted();

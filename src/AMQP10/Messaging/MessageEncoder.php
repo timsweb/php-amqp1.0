@@ -19,7 +19,11 @@ use AMQP10\Protocol\TypeEncoder;
  */
 class MessageEncoder
 {
-    public static function encode(Message $message): string
+    /**
+     * @param  string|null  $toAddress  Injected into the 'to' properties field when not already set on the
+     *                                   message. Required by IBM MQ when sending to a queue.
+     */
+    public static function encode(Message $message, ?string $toAddress = null): string
     {
         $sections = '';
 
@@ -53,7 +57,9 @@ class MessageEncoder
 
         // Properties section (spec §3.2.4)
         $props = $message->properties();
-        if (! empty($props) || $message->subject() !== null) {
+        // Use explicit 'to' from message, or fall back to injected toAddress.
+        $to = $props['to'] ?? $toAddress;
+        if (! empty($props) || $message->subject() !== null || $to !== null) {
             $sections .= self::section(Descriptor::MSG_PROPERTIES, [
                 isset($props['message-id'])
                     ? TypeEncoder::encodeString($props['message-id'])
@@ -61,8 +67,8 @@ class MessageEncoder
                 isset($props['user-id'])
                     ? TypeEncoder::encodeBinary($props['user-id'])
                     : TypeEncoder::encodeNull(),
-                isset($props['to'])
-                    ? TypeEncoder::encodeString($props['to'])
+                $to !== null
+                    ? TypeEncoder::encodeString($to)
                     : TypeEncoder::encodeNull(),
                 ($message->subject() ?? $props['subject'] ?? null) !== null
                     ? TypeEncoder::encodeString($message->subject() ?? $props['subject'])

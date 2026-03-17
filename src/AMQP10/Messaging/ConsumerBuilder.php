@@ -41,6 +41,9 @@ class ConsumerBuilder
 
     private int $reconnectBackoffMs = 1000;
 
+    /** @var array<string> */
+    private array $sourceCapabilities = [];
+
     /** @var int[] */
     private array $stopSignals = [];
 
@@ -104,6 +107,15 @@ class ConsumerBuilder
     public function expiryPolicy(ExpiryPolicy $policy = ExpiryPolicy::Never): self
     {
         $this->expiryPolicy = $policy;
+
+        return $this;
+    }
+
+    /** @param  array<string>  $capabilities */
+    public function withSourceCapabilities(array $capabilities): self
+    {
+        $this->sourceCapabilities = $capabilities;
+        $this->cachedConsumer = null;
 
         return $this;
     }
@@ -255,6 +267,7 @@ class ConsumerBuilder
                 expiryPolicy: $this->expiryPolicy,
                 reconnectRetries: $this->reconnectRetries,
                 reconnectBackoffMs: $this->reconnectBackoffMs,
+                sourceCapabilities: $this->sourceCapabilities,
             );
         }
 

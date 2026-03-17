@@ -79,6 +79,8 @@ class PerformativeEncoder
 
     /**
      * @param  array<string, string>|null  $properties
+     * @param  array<string>|null          $targetCapabilities
+     * @param  array<string>|null          $sourceCapabilities
      */
     public static function attach(
         int $channel,
@@ -94,6 +96,8 @@ class PerformativeEncoder
         ?string $filterMap = null,
         ?TerminusDurability $durable = null,
         ?ExpiryPolicy $expiryPolicy = null,
+        ?array $targetCapabilities = null,
+        ?array $sourceCapabilities = null,
     ): string {
         $fields = [
             TypeEncoder::encodeString($name),
@@ -101,8 +105,8 @@ class PerformativeEncoder
             TypeEncoder::encodeBool($role),
             TypeEncoder::encodeUbyte($sndSettleMode),
             TypeEncoder::encodeUbyte($rcvSettleMode),
-            self::encodeSource($source, $filterMap, $durable, $expiryPolicy),
-            self::encodeTarget($target),
+            self::encodeSource($source, $filterMap, $durable, $expiryPolicy, $sourceCapabilities),
+            self::encodeTarget($target, $targetCapabilities),
             TypeEncoder::encodeNull(), // unsettled
             TypeEncoder::encodeNull(), // incomplete-unsettled
             $initialDeliveryCount !== null
@@ -258,19 +262,27 @@ class PerformativeEncoder
         );
     }
 
+    /**
+     * @param  array<string>|null  $sourceCapabilities
+     */
     private static function encodeSource(
         ?string $address,
         ?string $filterMap = null,
         ?TerminusDurability $durable = null,
         ?ExpiryPolicy $expiryPolicy = null,
+        ?array $sourceCapabilities = null,
     ): string {
         if ($address === null) {
             return TypeEncoder::encodeNull();
         }
-        $hasExtras = $filterMap !== null || $durable !== null || $expiryPolicy !== null;
+        $hasExtras = $filterMap !== null || $durable !== null || $expiryPolicy !== null || $sourceCapabilities !== null;
         if (! $hasExtras) {
             $fields = [TypeEncoder::encodeString($address)];
         } else {
+            // Explicit capabilities override; fall back to rabbit:stream when a filter map is set.
+            $capabilitiesEncoded = $sourceCapabilities !== null
+                ? TypeEncoder::encodeSymbolArray($sourceCapabilities)
+                : ($filterMap !== null ? TypeEncoder::encodeSymbolArray(['rabbit:stream']) : TypeEncoder::encodeNull());
             $fields = [
                 TypeEncoder::encodeString($address),
                 $durable !== null
@@ -288,9 +300,7 @@ class PerformativeEncoder
                     : TypeEncoder::encodeNull(),
                 TypeEncoder::encodeNull(), // default-outcome
                 TypeEncoder::encodeNull(), // outcomes
-                $filterMap !== null
-                    ? TypeEncoder::encodeSymbolArray(['rabbit:stream'])
-                    : TypeEncoder::encodeNull(),
+                $capabilitiesEncoded,
             ];
         }
 
@@ -300,12 +310,27 @@ class PerformativeEncoder
         );
     }
 
-    private static function encodeTarget(?string $address): string
+    /**
+     * @param  array<string>|null  $capabilities
+     */
+    private static function encodeTarget(?string $address, ?array $capabilities = null): string
     {
         if ($address === null) {
             return TypeEncoder::encodeNull();
         }
-        $fields = [TypeEncoder::encodeString($address)];
+        if ($capabilities === null) {
+            $fields = [TypeEncoder::encodeString($address)];
+        } else {
+            $fields = [
+                TypeEncoder::encodeString($address),
+                TypeEncoder::encodeNull(), // durable
+                TypeEncoder::encodeNull(), // expiry-policy
+                TypeEncoder::encodeNull(), // timeout
+                TypeEncoder::encodeNull(), // dynamic
+                TypeEncoder::encodeNull(), // dynamic-node-properties
+                TypeEncoder::encodeSymbolArray($capabilities),
+            ];
+        }
 
         return TypeEncoder::encodeDescribed(
             TypeEncoder::encodeUlong(Descriptor::TARGET), // target descriptor

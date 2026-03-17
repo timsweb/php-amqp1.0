@@ -33,6 +33,10 @@ class Consumer
     /** @var array<int, string> */
     private array $partialDeliveries = [];
 
+    /**
+     * @param  ?array<string>  $filterBloomValues
+     * @param  array<string>   $sourceCapabilities
+     */
     public function __construct(
         private readonly Client $client,
         private readonly string $address,
@@ -40,7 +44,6 @@ class Consumer
         private readonly ?Offset $offset = null,
         private readonly ?string $filterJms = null,
         private readonly ?string $filterAmqpSql = null,
-        /** @var ?array<string> */
         private readonly ?array $filterBloomValues = null,
         private readonly bool $matchUnfiltered = false,
         private readonly float $idleTimeout = 30.0,
@@ -49,6 +52,7 @@ class Consumer
         private readonly ?ExpiryPolicy $expiryPolicy = null,
         private readonly int $reconnectRetries = 0,
         private readonly int $reconnectBackoffMs = 1000,
+        private readonly array $sourceCapabilities = [],
     ) {}
 
     private function buildLink(Session $session): ReceiverLink
@@ -63,6 +67,7 @@ class Consumer
             filterMap: $this->buildFilterMap(),
             durable: $this->durable,
             expiryPolicy: $this->expiryPolicy,
+            sourceCapabilities: $this->sourceCapabilities,
         );
     }
 
