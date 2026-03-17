@@ -6,7 +6,7 @@ This file is for AI agents working on this codebase. It covers architecture, con
 
 ## Project Overview
 
-A modern PHP 8.1+ AMQP 1.0 client for RabbitMQ 4.0+. The library is hand-rolled — no AMQP framework dependency. Every byte on the wire is encoded by code in this repo.
+A modern PHP 8.1+ AMQP 1.0 client for RabbitMQ 4.0+ and IBM MQ 9.4.2+. The library is hand-rolled — no AMQP framework dependency. Every byte on the wire is encoded by code in this repo.
 
 **GitHub:** https://github.com/timsweb/php-amqp1.0
 **Packagist:** `php-amqp10/client`
@@ -43,7 +43,8 @@ Client API          src/AMQP10/Client/
 | `src/AMQP10/Connection/Session.php` | Manages the frame buffer and `readFrameOfType()` |
 | `src/AMQP10/Messaging/Consumer.php` | Builds the filter-set map and drives the receive loop |
 | `src/AMQP10/Messaging/ConsumerBuilder.php` | Fluent API for setting up consumers |
-| `tests/Integration/` | Integration tests — require a live RabbitMQ 4.x instance |
+| `tests/Integration/RabbitMqTestCase.php` | Base class for RabbitMQ integration tests — spins up a container automatically |
+| `tests/Integration/IbmMqTestCase.php` | Base class for IBM MQ integration tests — requires a locally-built Docker image or `IBMMQ_AMQP_URI` env var |
 
 ---
 
@@ -53,11 +54,20 @@ Client API          src/AMQP10/Client/
 # Unit tests only (no broker needed)
 ./vendor/bin/phpunit --testsuite Unit
 
-# Integration tests (starts RabbitMQ automatically via testcontainers — requires Docker)
+# All integration tests (RabbitMQ starts automatically via testcontainers — requires Docker)
 ./vendor/bin/phpunit --testsuite Integration
+
+# RabbitMQ integration tests only
+./vendor/bin/phpunit --testsuite Integration --filter RabbitMq
+
+# IBM MQ integration tests — against a locally-built Docker image (see docs/brokers/ibm-mq.md)
+./vendor/bin/phpunit --testsuite Integration --filter IbmMq
+
+# IBM MQ integration tests — against an external IBM MQ instance
+IBMMQ_AMQP_URI="amqp://app:passw0rd@your-host:5672/" ./vendor/bin/phpunit --testsuite Integration --filter IbmMq
 ```
 
-Integration tests spin up a RabbitMQ 4.x container automatically via testcontainers-php. See `tests/Integration/RabbitMqTestCase.php`.
+RabbitMQ tests spin up a container automatically via testcontainers-php. IBM MQ tests require either a pre-built local Docker image (`ibm-mqadvanced-server-dev:9.4.2.1-amd64`) or an external instance — see `docs/brokers/ibm-mq.md` for the full setup procedure. If neither is available, IBM MQ tests are skipped individually via `requireIbmMq()`.
 
 ---
 
@@ -76,6 +86,18 @@ This project uses **Laravel Pint** with the **PER 3.0** preset for automated sty
 **PER 3.0** (PHP-ECMA-Reference) is a modern, opinionated coding standard based on PSR-12 but with stricter rules. See the [PER specification](https://github.com/php-fig/per) for details.
 
 Style checking runs automatically in CI via `./vendor/bin/pint --test`. New code should pass Pint before committing.
+
+---
+
+## Static Analysis
+
+This project uses **PHPStan** at a strict level. Run it before committing:
+
+```bash
+./vendor/bin/phpstan analyse
+```
+
+All `array` parameters that hold typed values must have a generic annotation (`array<string>`, `array<int, string>`, etc.). PHPStan will reject bare `array` types.
 
 ---
 
@@ -200,7 +222,45 @@ if ($this->management === null || $this->management->isClosed()) {
 
 **Why this matters:** a closed `Management` has detached its AMQP sender/receiver links. Using it for further requests sends frames with dead handles. The broker responds with an error frame that `awaitResponse()` silently ignores (it only looks for TRANSFER frames), causing a 30-second timeout spin before throwing `ManagementException`.
 
-### 9. Unit tests passing does not mean the wire format is correct
+### 9. IBM MQ: ATTACH capabilities are required for queue routing
+
+IBM MQ's AMQP service treats **all** target addresses as topic strings by default. Without `capabilities=["queue"]` in the ATTACH frame's target terminus (field 6), IBM MQ will respond with `amqp:not-found` on every TRANSFER even for valid queue names. The AMQP trace logs `targetObjectType:topic` in this case.
+
+Always use `withTargetCapabilities(['queue'])` on `PublisherBuilder` and `withSourceCapabilities(['queue'])` on `ConsumerBuilder` when targeting an IBM MQ queue. These propagate via `PerformativeEncoder::attach()` → `encodeTarget()` / `encodeSource()`.
+
+The IBM MQ AMQP trace at `/mnt/mqm/data/trace/amqpRunMQXRService_*.trc` is invaluable — it logs the full decoded ATTACH and TRANSFER frames including capabilities and target object type.
+
+### 10. IBM MQ: the message properties 'to' field is required when sending to a queue
+
+Even when the ATTACH frame already specifies a target address, IBM MQ requires the AMQP message properties `to` field (section 3.2.4, field 2) to also name the destination queue. Without it, IBM MQ throws `AMQXR0032E: ClientIdentifier '...' has not specified an address to obtain the destination name` and rejects the message.
+
+Use `PublisherBuilder::withMessageToAddress()` to inject the target address into the `to` field automatically. Internally, `Publisher::send()` passes the address to `MessageEncoder::encode()` as `$toAddress`, which is used as a fallback when `$props['to']` is not already set on the message.
+
+This is IBM MQ-specific behaviour. RabbitMQ ignores the `to` field when the ATTACH target is set.
+
+### 11. IBM MQ: the AMQP service does not start automatically with the queue manager
+
+`CONTROL(QMGR)` in the MQSC `ALTER SERVICE` statement starts `amqpcsea` (the C side) but does **not** launch the Java `RunMQXRService` listener that accepts AMQP TCP connections. The listener must be started explicitly:
+
+```bash
+echo 'START SERVICE(SYSTEM.AMQP.SERVICE)' | runmqsc QM1
+```
+
+Additionally, IBM MQ's CHLAUTH backstop rule blocks all channels by default. The MQSC template sets an exception for `SYSTEM.DEF.AMQP` (the template channel), but CHLAUTH checks use the **actual** AMQP channel name (e.g. `DEV.AMQP`). Add the rule for the real channel after the container starts:
+
+```bash
+echo "SET CHLAUTH('DEV.AMQP') TYPE(ADDRESSMAP) ADDRESS('*') USERSRC(CHANNEL) CHCKCLNT(REQUIRED) ACTION(REPLACE)" | runmqsc QM1
+```
+
+See `tests/Integration/IbmMqTestCase::setUpBeforeClass()` for the full startup sequence.
+
+### 12. IBM MQ: sender ATTACH with null source causes a NullPointerException
+
+IBM MQ 9.4.2's `AMQPServerSessionV10.processProtonUpdates` throws `java.lang.NullPointerException` at line 1564 when the sender ATTACH frame has a null source terminus. The AMQP 1.0 spec permits a null source on sender links, but IBM MQ does not handle it gracefully.
+
+`Publisher` works around this by always sending `source: ''` (an empty string SOURCE terminus). This is harmless on RabbitMQ.
+
+### 13. Unit tests passing does not mean the wire format is correct
 
 `TypeDecoder` decodes both `STR8` and `SYM8` to plain PHP strings, so unit tests asserting decoded map structure can't tell whether the encoder chose the right AMQP type. Always validate filter behaviour against a live RabbitMQ instance when changing encoding logic.
 
